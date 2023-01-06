@@ -3,6 +3,7 @@ using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
 using ImmersiveProjector.Tiles;
+using Terraria.GameContent.Creative;
 
 namespace ImmersiveProjector.Items
 {
@@ -12,6 +13,7 @@ namespace ImmersiveProjector.Items
         {
             // DisplayName.SetDefault("Hookshot Spot");
             // Tooltip.SetDefault("Placeable hookshot spot.");
+            CreativeItemSacrificesCatalog.Instance.SacrificeCountNeededByItemId[Type] = 1;
         }
 
         public override void SetDefaults()
@@ -30,6 +32,10 @@ namespace ImmersiveProjector.Items
         public override void AddRecipes()
         {
             Recipe recipe = CreateRecipe();
+            recipe.AddRecipeGroup("IronBar");
+            recipe.AddIngredient(ItemID.Glass);
+            recipe.AddIngredient(ItemID.FallenStar, 3);
+            recipe.AddTile(TileID.WorkBenches);
 			recipe.Register();
 		}
     }

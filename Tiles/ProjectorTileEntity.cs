@@ -25,7 +25,7 @@ namespace ImmersiveProjector.Tiles
 
         public ProjectorInstance projectorInstance = null;
         public ProjectorData data => projectorInstance != null ? projectorInstance.data : null;
-        public bool TurnedOn => Main.tile[Position.ToPoint()].TileFrameY >= 18;
+        public bool TurnedOn => data == null ? Main.tile[Position.ToPoint()].TileFrameY >= 18 : data.turnedOn > 0;
 
         public void ResetProjector()
         {
@@ -38,7 +38,7 @@ namespace ImmersiveProjector.Tiles
 
         public override void Update()
         {
-            if (statusChanged)
+            if (statusChanged && projectorInstance != null)
             {
                 NetMessage.SendData(MessageID.TileEntitySharing, -1, -1, null, ID, Position.X, Position.Y);
                 statusChanged = false;
@@ -51,7 +51,7 @@ namespace ImmersiveProjector.Tiles
             options.IncludeFields = true;
             options.IgnoreReadOnlyFields = true;
             options.IgnoreReadOnlyProperties = true;
-            return data != null ? JsonSerializer.Serialize(data, typeof(ProjectorData), options) : "";
+            return data != null ? JsonSerializer.Serialize(data, typeof(ProjectorData), options) : "ennia";
         }
 
         public bool BuildFromSerializedData(string doc)
@@ -82,7 +82,7 @@ namespace ImmersiveProjector.Tiles
         public override void NetReceive(BinaryReader reader)
         {
             var doc = reader.ReadString();
-            if (Main.netMode != NetmodeID.Server)
+            if (Main.netMode != NetmodeID.Server && ImmersiveProjector.DEBUG_MODE)
             {
                 Main.NewText("Rece");
                 Main.NewText(doc);
@@ -93,7 +93,7 @@ namespace ImmersiveProjector.Tiles
         public override void NetSend(BinaryWriter writer)
         {
             var doc = GetSerializedData();
-            if (Main.netMode != NetmodeID.Server)
+            if (Main.netMode != NetmodeID.Server && ImmersiveProjector.DEBUG_MODE)
             {
                 Main.NewText("Send");
                 Main.NewText(doc);
@@ -112,6 +112,14 @@ namespace ImmersiveProjector.Tiles
             BuildFromSerializedData(doc);
         }
 
+        public override void OnNetPlace()
+        {
+            Main.tile[Position.X, Position.Y].TileFrameY = 18;
+            projectorInstance = ProjectorInstance.CreateInstance(Position.ToPoint(), ProjectorSystem.ListInWorld);
+            projectorInstance.data.turnedOn = 1;
+            MarkNetUpdate();
+        }
+
         public override int Hook_AfterPlacement(int i, int j, int type, int style, int direction, int alternate)
         {
             // Main.NewText("i " + i + " j " + j + " t " + type + " s " + style + " d " + direction);
@@ -119,17 +127,22 @@ namespace ImmersiveProjector.Tiles
             {
                 NetMessage.SendTileSquare(Main.myPlayer, i, j, 3);
                 NetMessage.SendData(MessageID.TileEntityPlacement, -1, -1, null, i, j, Type, 0f, 0, 0, 0);
+                Main.tile[i, j].TileFrameY = 18;
                 return -1;
             }
             int id = Place(i, j);
             Main.tile[i, j].TileFrameY = 18;
-            (TileEntity.ByID[id] as ProjectorTileEntity).projectorInstance = ProjectorInstance.CreateInstance(new Point(i, j), ProjectorSystem.ListInWorld);
+            if (Main.netMode == NetmodeID.SinglePlayer)
+            {
+                ((ProjectorTileEntity)ByID[id]).projectorInstance = ProjectorInstance.CreateInstance(new Point(i, j), ProjectorSystem.ListInWorld);
+            }
             return id;
         }
 
         public override void OnKill()
         {
-            ProjectorSystem.ListInWorld.Remove(projectorInstance);
+            if (projectorInstance != null)
+                ProjectorSystem.ListInWorld.Remove(projectorInstance);
             base.OnKill();
         }
 

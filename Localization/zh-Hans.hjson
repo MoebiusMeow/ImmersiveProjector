@@ -1,4 +1,5 @@
-﻿# You may find this .hjson file approach to translations easier for your mod.
+﻿
+# You may find this .hjson file approach to translations easier for your mod.
 # .hjson files contain translations for the language specified in the filename. (Make sure this file is UTF-8 encoded only.)
 # The possible languages are: English ("en-US"), German ("de-DE"), Italian ("it-IT"), French ("fr-FR"), Spanish ("es-ES"), Russian ("ru-RU"), Chinese ("zh-Hans"), Portuguese ("pt-BR"), and Polish ("pl-PL")
 # Here in ExampleMod we have organized these files in a folder called Localization. A single file per language makes it extremely easy to to integrate and maintain translations.
@@ -8,21 +9,100 @@
 
 Mods: {
 	ImmersiveProjector: {
+		ItemName: {
+			MiniProjector: 微型投影仪
+		}
+
+		ItemTooltip: {
+			MiniProjector:
+				'''
+				高度压缩的通用投影仪器
+				[c/00FF00:右键交互打开配置界面]
+				
+				‘什么…这不是饼干’
+				'''
+		}
+
+		MapObject: {
+			MiniProjectorTile: "{$Mods.ImmersiveProjector.ItemName.MiniProjector}"
+		}
+
 		Config: {
 
-			Prefabs: Presets
-			SelectArea: Select Area
-			Settings: Settings
-			Behavior: Behavior
+			Prefabs: 预设
+			SelectArea: 区域选择
+			Settings: 设置
+			Behavior: 行为
+			Color: 颜色
 
-			Description0: Presets Browser
-			Description1: Select projection area
-			Description2: Projector Settings
-			Description3: Interaction Behavior
+			Description0: 预设列表
+			Description1: 选择投影区域
+			Description2: 投影仪选项
+			Description3: 交互行为设置
+			Description4: 投影颜色
 
-			Cancel: Cancel
-			Hide: Hide
-			Confirm: Confim
+			Snapping: 选框对齐
+			SnappingBlock: 物块
+			Flip: 翻转
+			FlipN: 不翻转
+			FlipH: 左右镜像
+			FlipV: 上下镜像
+			DoubleClickResetPosition: 双击此处重置范围
+			TargetRotation: 旋转目标影像
+
+			CaptureTiles: 拍摄物块
+			CaptureTilesN: 无
+			CaptureTilesS: 实心物块
+			CaptureTilesA: 所有物块
+
+			CaptureWalls: 拍摄墙壁
+			CaptureWallsN: 无
+			CaptureWallsT: 所有墙壁
+
+			CaptureCreatures: 拍摄实体
+			CaptureCreaturesN: 无
+			CaptureCreaturesA: 所有实体
+
+			CaptureBlends: 投影混合
+			CaptureBlendsD: 默认
+			CaptureBlendsA: 颜色叠加
+
+			CaptureLayers: 影像所处层级
+			CaptureLayersF: 前景
+			CaptureLayersN: 一般
+			CaptureLayersBF: 家具后
+			CaptureLayersBW: 墙体后
+
+			CapturePriority: 层叠优先级
+			CapturePriorityToolTip: 重叠的投影间的相互优先级
+
+			Red: 红
+			Green: 绿
+			Blue: 蓝
+			Opacity: 不透明度
+
+			CaptureBehavior: 影像触碰玩家时
+			CaptureBehaviorN: 无交互
+			CaptureBehaviorH: 淡出至一半
+			CaptureBehaviorF: 完全淡出
+			CaptureBehaviorD: 影像扰动
+
+			CaptureFollowS: 摄像区域跟踪
+			CaptureFollowSId: (对象下标)
+			CaptureFollowT: 投影区域跟踪
+			CaptureFollowTId: (对象下标)
+			CaptureFollowN: 不跟踪
+			CaptureFollowP: 玩家
+			CaptureFollowTN: 城镇NPC
+			CaptureFollowB: Boss
+
+			CaptureFilter: 视觉特效
+			CaptureFilterN: 无滤镜
+			CaptureFilterH: 全息特效
+
+			Cancel: 取消
+			Hide: 隐藏
+			Confirm: 保存
 		}
 	}
 }

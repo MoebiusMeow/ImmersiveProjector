@@ -147,9 +147,13 @@ namespace ImmersiveProjector.UI
 			if (focusedInstance == null || tempData == null) return;
             tempData.CopyDataFrom(focusedInstance.data);
             TileEntity.ByPosition.TryGetValue(focusedInstance.tilePosition.ToVector2().ToPoint16(), out var te);
-			if (te is ProjectorTileEntity entity)
+            if (ImmersiveProjector.DEBUG_MODE)
+                Main.NewText("Commit");
+            if (te is ProjectorTileEntity entity)
 			{
 				entity.MarkNetUpdate();
+                if (ImmersiveProjector.DEBUG_MODE)
+                    Main.NewText("Mark");
 			}
 		}
 
@@ -253,6 +257,11 @@ namespace ImmersiveProjector.UI
             Asset<Texture2D> assetSlotBack = Main.Assets.Request<Texture2D>("Images/UI/Bestiary/Slot_Back");
             Asset<Texture2D> assetSlotFront = Main.Assets.Request<Texture2D>("Images/UI/Bestiary/Slot_Front");
             Asset<Texture2D> assetSlotHover = Main.Assets.Request<Texture2D>("Images/UI/Bestiary/Slot_Selection");
+            Asset<Texture2D> asset= Main.Assets.Request<Texture2D>("Images/UI/Bestiary/Icon_Locked");
+
+            UIElement btn = new PresetFrame(assetSlotFront, assetSlotHover, assetSlotBack, asset, 1, "Coming Soon");
+            uiList.Add(btn);
+			/*
             string[] testAssets = new string[]{
                     "Camera_0",
                     "Camera_1",
@@ -301,6 +310,7 @@ namespace ImmersiveProjector.UI
                 };
                 uiList.Add(btn);
             }
+			*/
             uiList.RecalculateChildren();
             page.Append(uiScrollbar);
         }
@@ -552,11 +562,22 @@ namespace ImmersiveProjector.UI
                 ImmersiveProjector.ModTranslate("CaptureFollowTN", "Config."),
                 ImmersiveProjector.ModTranslate("CaptureFollowB", "Config."),
 			};
+
+			SliderPanel SourceIdVPanel = new SliderPanel(0, 1, Color.Cyan, panelBackground, null);
+			SourceIdVPanel.valueSnapping = 0.01f;
+			SourceIdVPanel.tooltip = SourceIdVPanel.configName = ImmersiveProjector.ModTranslate("CaptureFollowSId", "Config.");
+			SourceIdVPanel.bindedValue = typeof(ProjectorData).GetField("sourceFollowId");
+			sliderPanels.Add(SourceIdVPanel);
+			SourceIdVPanel.Width.Set(0, 1);
+			SourceIdVPanel.Top.Set(-(tabHeight[index] - 132), 1);
+			SourceIdVPanel.Height.Set(40, 0);
+			page.Append(SourceIdVPanel);
 			page.Append(captureFollowSVPanel);
+
 
 			TogglePanel captureFollowTVPanel = new TogglePanel(4, toggleItemTexture, new Rectangle(0, 32 * 5, 32, 32), panelBackground);
 			captureFollowTVPanel.Width.Set(0, 1);
-			captureFollowTVPanel.Top.Set(-(tabHeight[index] - 140), 1);
+			captureFollowTVPanel.Top.Set(-(tabHeight[index] - 170), 1);
 			captureFollowTVPanel.Height.Set(40, 0);
 			captureFollowTVPanel.configName = ImmersiveProjector.ModTranslate("CaptureFollowT", "Config.");
 			captureFollowTVPanel.bindedValue = typeof(ProjectorData).GetField("targetFollow");
@@ -569,8 +590,17 @@ namespace ImmersiveProjector.UI
                 ImmersiveProjector.ModTranslate("CaptureFollowTN", "Config."),
                 ImmersiveProjector.ModTranslate("CaptureFollowB", "Config."),
 			};
-			page.Append(captureFollowTVPanel);
 
+			SliderPanel TargetIdVPanel = new SliderPanel(0, 1, Color.Orange, panelBackground, null);
+			TargetIdVPanel.valueSnapping = 0.01f;
+			TargetIdVPanel.tooltip = TargetIdVPanel.configName = ImmersiveProjector.ModTranslate("CaptureFollowTId", "Config.");
+			TargetIdVPanel.bindedValue = typeof(ProjectorData).GetField("targetFollowId");
+			sliderPanels.Add(TargetIdVPanel);
+			TargetIdVPanel.Width.Set(0, 1);
+			TargetIdVPanel.Top.Set(-(tabHeight[index] - 202), 1);
+			TargetIdVPanel.Height.Set(40, 0);
+			page.Append(TargetIdVPanel);
+			page.Append(captureFollowTVPanel);
 
 		}
 
@@ -616,7 +646,7 @@ namespace ImmersiveProjector.UI
 			ColorAVPanel.Height.Set(40, 0);
 			page.Append(ColorAVPanel);
 
-			TogglePanel captureFilterVPanel = new TogglePanel(1, toggleItemTexture, new Rectangle(0, 32 * 6, 32, 32), panelBackground);
+			TogglePanel captureFilterVPanel = new TogglePanel(2, toggleItemTexture, new Rectangle(0, 32 * 6, 32, 32), panelBackground);
 			captureFilterVPanel.Width.Set(0, 1);
 			captureFilterVPanel.Top.Set(-(tabHeight[index] - 220), 1);
 			captureFilterVPanel.Height.Set(40, 0);
@@ -629,7 +659,7 @@ namespace ImmersiveProjector.UI
                 ImmersiveProjector.ModTranslate("CaptureFilterN", "Config."),
                 ImmersiveProjector.ModTranslate("CaptureFilterH", "Config."),
 			};
-			page.Append(captureFilterVPanel);
+			// page.Append(captureFilterVPanel);
 		}
 
 		public void InitializeAll()
@@ -778,8 +808,16 @@ namespace ImmersiveProjector.UI
 					return;
 				}
 			}
-			tabPages[currentPage].Width.Set(0, 1);
-			tabPages[currentPage].Height.Set(0, 1);
+			if (currentPage != -1)
+			{
+				tabPages[currentPage].Width.Set(0, 1);
+				tabPages[currentPage].Height.Set(0, 1);
+			}
+			else if (tweenToPage == -1)
+			{
+				ModContent.GetInstance<UISystem>().userInterface.SetState(null);
+				return;
+			}
 
 			// sourceGrid.SetFromAnchorAndSize(Main.LocalPlayer.Center, Vector2.One * 0.5f, Vector2.One * 200);
 			if (currentPage == 1)
@@ -791,9 +829,13 @@ namespace ImmersiveProjector.UI
 					focusedInstance.data.sourcePoint = sourceGrid.anchorPosition;
 					focusedInstance.data.sourceSize = sourceGrid.Size;
 					focusedInstance.data.targetPoint = targetGrid.anchorPosition;
+					/*
 					focusedInstance.data.targetScale = sourceGrid.draggingExpanding ?
 						MathF.Max(targetGrid.Size.X / sourceGrid.Size.X, targetGrid.Size.Y / sourceGrid.Size.Y):
 						MathF.Min(targetGrid.Size.X / sourceGrid.Size.X, targetGrid.Size.Y / sourceGrid.Size.Y);
+					*/
+					if (targetGrid.buttons[targetGrid.draggingStyleX, targetGrid.draggingStyleY].dragging)
+                        focusedInstance.data.targetScale = MathF.Min(targetGrid.Size.X / sourceGrid.Size.X, targetGrid.Size.Y / sourceGrid.Size.Y);
                     targetGrid.SetFromAnchorAndSize(focusedInstance.data.targetPoint, focusedInstance.data.anchor, focusedInstance.data.targetSize);
 				}
 				sourceGrid.UpdateHandlePositions();

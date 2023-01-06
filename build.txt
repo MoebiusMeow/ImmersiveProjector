@@ -1,3 +1,3 @@
-displayName = Immersive Projector
+displayName = Immersive Projector (BETA)
 author = MoebiusMeow
-version = 0.1
+version = 0.1.0

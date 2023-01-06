@@ -76,6 +76,8 @@ namespace ImmersiveProjector.DataStructure
         }
 
         [JsonInclude]
+        public int turnedOn;
+        [JsonInclude]
         public Vector2 anchor; // (0, 0) to (1, 1)
         [JsonInclude]
         public Vector2 sourcePoint;
@@ -107,7 +109,11 @@ namespace ImmersiveProjector.DataStructure
         [JsonInclude]
         public int sourceFollow;
         [JsonInclude]
+        public float sourceFollowId;
+        [JsonInclude]
         public int targetFollow;
+        [JsonInclude]
+        public float targetFollowId;
         [JsonInclude]
         public int filter;
 
@@ -157,6 +163,7 @@ namespace ImmersiveProjector.DataStructure
             captureSolid = 2;
             captureWall = 1;
             colorA = colorR = colorG = colorB = 1;
+            turnedOn = 1;
         }
 
         public void CopyDataFrom(ProjectorData other)

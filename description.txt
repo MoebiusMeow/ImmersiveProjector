@@ -1,1 +1,110 @@
-Immersive Projector is a pretty cool mod, it does...this. Modify this file with a description of your mod.
+[c/00FF00:Immersive Projector (BETA) 沉浸式投影仪]
+
+A mod that allows you to project anything (terrain/building/creature...) in your world from anywhere.
+The projection area can be as large as the whole world.
+从此你能投影世界上的一切，不论山川草木，整个世界不过咫尺
+
+Features:
++ Project anywhere: The projector can capture and project real-time image from anywhere even if being out of your screen.
++ Highly Customized: You can config area of capturing and projection, scale, rotation, color, layer, blending mode and much more with a friendly UI. 
++ Compatible with vanilla camera mode
+
+
+Usage Examples:
++ Building foreground:
+Build two buildings with the same shape (one for building outlook and one for inside). Then setup a projection that projects one into the other. Set the projector behavior to "When players enter - Half-faded".
+Now you have a enterable building with foreground wall.
+
++ Water reflection zone:
+Setup a projector that projects the area above water to an area under water. Set the "flip" option to "flip vertically".
+Then set the "Capture Entities" option to "All Entities".
+Now you have a water surface with beautiful reflection.
+
++ Customized Hologram
+Setup a projector that projects anything you want. Then set the "Blending" config to "Additive light", set color to R=0, G=1, B=1.
+Also set "Projection layer" to "Behind Furnitures". At last, set behavior to "When players enter - Distorted".
+Now you have a cool hologram which get distorted when you step into.
+
+And much more...!
+As long as you can imagine.
+
+
+
+
+
+Warnings:
+* This mod is in [c/FF0000:BETA] version. All features might be changed in future iterations. 
+* Multi-player is [c/FF0000:not] fully supported in current version. You can still see the projection in multi-player mode, though all the changes on projector settings would be synced.
+(If you have to play multi-player mode. You should first setup all the projector in single-player and leave them unchanged during your multi-player gameplay)
+* It is highly recommended to use [c/FF00FF:Color] lighting mode.
+
+
+Recipes:
++ To craft a Mini Projector, you'll need:
+1 Iron / Lead Bar
+1 Glass Block
+3 Fallen Stars
+and craft at a Workbench
+
+Then all you need is to place it in your world and do some configurations.
+
+
+
+Mail: MoebiusMeow@gmail.com
+
+Version 0.1.0
+by Moebius Meow
+
+主要功能:
++ 远距离投影: 不管离屏幕多远，都能实时捕获与投影
++ 高度定制化: 通过友好的UI配置投影的范围、缩放、旋转、颜色、层级、混合模式还有更多乱七八糟的选项
++ 和原版截图模式兼容
+
+
+用法举例：
++ 建筑前景层:
+建造两个同样轮廓的建筑，分别用作建筑的外墙和内饰。使用投影仪把外墙投影到内饰建筑的重合位置，设置行为选项为“影像触碰玩家时-淡出一半”
+现在你就有了一个可进入的多层立体建筑了！
+
++ 水面反射区域:
+使用投影仪把一块水上区域投影到水下，然后设置“翻转”为“上下翻转”。接着设置"拍摄实体"选项为"所有实体"。
+现在你就有了一块漂亮的水反水面了。
+
++ 自定义全息投影
+使用投影仪投影你想投影的东西，然后设置“投影混合”为“颜色叠加”，设置颜色为红0绿1蓝1。
+也要设置“投影层级”为"家具后"，最后设置行为"影像触碰玩家时 - 扰动"。
+现在你就有了一个炫酷的全息投影，在你走上去时还会被扰动。
+
+以及更多！
+只要你想得到
+
+
+
+
+
+注意:
+* 这个MOD现在是[c/FF0000:BETA]版本，所有机制在未来都可能改动。
+* 当前版本多人游戏[c/FF0000:没有完全适配]。尽管你可以在多人模式看到已经放好的投影，但是你对投影做的改动不会被同步。
+(如果你真的急着在这个版本玩多人，你可以在单人游戏配置好所有投影，进多人以后就别再动了)
+* 请使用“彩色”光照模式（其他模式的适配还在进行中）
+
+
+
+配方:
++ 微型投影仪:
+1个铁锭/铅锭
+1个玻璃块
+3个落星
+然后在工作台合成
+
+接下来你只要放置和配置就行了！
+
+
+反馈和联系作者可以联系
+MoebiusMeow@qq.com
+Bilibili @三月猫MMU
+
+Version 0.1.0
+by Moebius Meow
+
+

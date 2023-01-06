@@ -27,6 +27,7 @@ using Terraria.GameInput;
 using Terraria.Graphics.Capture;
 using Terraria.GameContent.Events;
 using System.Linq.Expressions;
+using Humanizer;
 
 namespace ImmersiveProjector
 {
@@ -54,14 +55,17 @@ namespace ImmersiveProjector
 		public LightingEngine projectorLightingEngine = new LightingEngine();
 		public LegacyLighting projectorLegacyLighting = new LegacyLighting(Main.Camera);
 		private bool legacyLightingRebuilt;
-		public IList perFrameLightList;
+		public IList perFrameLightList = null;
 
 		// Liquid Renderer
+		public LiquidRenderer projectorLiquidRenderer;
 		private bool projectorLiquidProcessing = false;
 		private float projectorLiquidToScale = 1f;
 
 		// Hook flag
 		private bool projectorProcessing = false;
+
+		private bool findingTargetFlag = false;
 
 		public UISystem uiSystem { get => ModContent.GetInstance<UISystem>(); }
 
@@ -73,6 +77,7 @@ namespace ImmersiveProjector
 		public Action<SpriteBatch> delayedSpriteDraw;
 
 		// For faster reflection
+		// WIP
 		private Dictionary<string, FieldInfo> _fieldCache = new();
 		private Dictionary<string, Func<object, object>> _fieldGetterCache = new();
 		private Dictionary<string, Action<object, object>> _fieldSetterCache = new();
@@ -189,6 +194,9 @@ namespace ImmersiveProjector
 		public override void OnModLoad()
 		{
 			projectorRangeDisplayEffect = Mod.Assets.Request<Effect>("Effects/ProjectorRangeDisplay", AssetRequestMode.ImmediateLoad).Value;
+			projectorLiquidRenderer = new LiquidRenderer();
+			var info = typeof(LiquidRenderer).GetMethod("PrepareAssets", BindingFlags.Instance | BindingFlags.NonPublic);
+			info.Invoke(projectorLiquidRenderer, new object[] { });
 			base.OnModLoad();
 		}
 
@@ -238,6 +246,8 @@ namespace ImmersiveProjector
 		public void QuickDrawBoxLocal(Vector2 position, Vector2 size, Color color)
 		{
 			Rectangle simpleRect = new Rectangle(0, 0, 1, 1);
+			size.X = MathF.Max(0, size.X);
+			size.Y = MathF.Max(0, size.Y);
 			Vector2 UnitX = Vector2.UnitX * size / 16f;
 			Vector2 UnitY = Vector2.UnitY * size / 16f;
 			Vector2 SX = UnitX + Vector2.UnitY;
@@ -310,6 +320,45 @@ namespace ImmersiveProjector
 		public void HookedDraw(ProjectorInstance structure)
 		{
 			var targetSize = structure.data.targetSize;
+			var targetFollowOffset = Vector2.Zero;
+
+			switch (structure.data.targetFollow)
+			{
+				case (int)ProjectorData.FollowingFlag.Player:
+					for (var i = 0; i < Main.player.Length; i++)
+					{
+						var player = Main.player[(i + (int)(structure.data.targetFollowId * Main.player.Length)) % Main.npc.Length];
+						if (player.active)
+						{
+							targetFollowOffset = -structure.data.targetPoint + player.Center;
+							break;
+						}
+					}
+					break;
+				case (int)ProjectorData.FollowingFlag.Boss:
+					for (var i = 0; i < Main.npc.Length; i++)
+					{
+						var npc = Main.npc[(i + (int)(structure.data.targetFollowId * Main.npc.Length)) % Main.npc.Length];
+						if (npc.active && npc.boss)
+						{
+							targetFollowOffset = -structure.data.targetPoint + npc.Center;
+							break;
+						}
+					}
+					break;
+				case (int)ProjectorData.FollowingFlag.TownNPC:
+					for (var i = 0; i < Main.npc.Length; i++)
+					{
+						var npc = Main.npc[(i + (int)(structure.data.targetFollowId * Main.npc.Length)) % Main.npc.Length];
+						if (npc.active && npc.townNPC)
+						{
+							targetFollowOffset = -structure.data.targetPoint + npc.Center;
+							break;
+						}
+					}
+					break;
+			}
+			structure.data.targetPoint += targetFollowOffset;
 
 			Vector2 targetBoundingR = targetSize.RotatedBy(structure.data.targetRotation / 180f * MathF.PI) * 0.5f;
 			targetBoundingR.X = MathF.Abs(targetBoundingR.X);
@@ -325,8 +374,11 @@ namespace ImmersiveProjector
 			// Target out of screen
 			if ((uiSystem.projectorUIState.focusedInstance != structure || uiSystem.userInterface.CurrentState != uiSystem.projectorUIState) &&
 				(targetBoundTopLeft.X > Main.screenPosition.X + Main.screenWidth || targetBoundBottomRight.X < Main.screenPosition.X ||
-                 targetBoundTopLeft.Y > Main.screenPosition.Y + Main.screenHeight || targetBoundBottomRight.Y < Main.screenPosition.Y))
+				 targetBoundTopLeft.Y > Main.screenPosition.Y + Main.screenHeight || targetBoundBottomRight.Y < Main.screenPosition.Y))
+			{
+				structure.data.targetPoint -= targetFollowOffset;
 				return;
+			}
 
             var hitFlag = (targetBoundTopLeft.X < Main.LocalPlayer.position.X + Main.LocalPlayer.width && targetBoundBottomRight.X > Main.LocalPlayer.position.X
                         && targetBoundTopLeft.Y < Main.LocalPlayer.position.Y + Main.LocalPlayer.height && targetBoundBottomRight.Y > Main.LocalPlayer.position.Y);
@@ -340,33 +392,56 @@ namespace ImmersiveProjector
 			else
 				structure.fadingValue = 0;
 
+			float clipL = Main.screenPosition.X + 00 - 4;
+			float clipT = Main.screenPosition.Y + 00 - 4;
+			float clipR = Main.screenPosition.X + Main.screenWidth + 00 + 4;
+			float clipB = Main.screenPosition.Y + Main.screenHeight + 00 + 4;
+
 			targetBoundTopLeft = new Vector2
             (
-                MathF.Max(targetBoundTopLeft.X, Main.screenPosition.X + 000),
-                MathF.Max(targetBoundTopLeft.Y, Main.screenPosition.Y + 000)
+                MathF.Max(targetBoundTopLeft.X, clipL),
+                MathF.Max(targetBoundTopLeft.Y, clipT)
             );
 
 			targetBoundBottomRight = new Vector2
             (
-                MathF.Min(targetBoundBottomRight.X, Main.screenPosition.X + Main.screenWidth - 000),
-                MathF.Min(targetBoundBottomRight.Y, Main.screenPosition.Y + Main.screenHeight - 000)
+                MathF.Min(targetBoundBottomRight.X, clipR),
+                MathF.Min(targetBoundBottomRight.Y, clipB)
             );
 
 			if (targetBoundTopLeft.X > targetBoundBottomRight.X || targetBoundTopLeft.Y > targetBoundBottomRight.Y)
+			{
+				structure.data.targetPoint -= targetFollowOffset;
 				return;
+			}
 
 			Vector2 targetBoundingT1 = (targetBoundTopLeft - structure.data.targetPoint).RotatedBy(-structure.data.targetRotation / 180f * MathF.PI);
 			Vector2 targetBoundingT2 = (new Vector2(targetBoundTopLeft.X, targetBoundBottomRight.Y) - structure.data.targetPoint).RotatedBy(-structure.data.targetRotation / 180f * MathF.PI);
 			Vector2 targetBoundingT3 = (targetBoundBottomRight - structure.data.targetPoint).RotatedBy(-structure.data.targetRotation / 180f * MathF.PI);
 			Vector2 targetBoundingT4 = (new Vector2(targetBoundBottomRight.X, targetBoundTopLeft.Y) - structure.data.targetPoint).RotatedBy(-structure.data.targetRotation / 180f * MathF.PI);
 
-			targetBoundTopLeft = new Vector2
+			if (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Horizontal)
+			{
+				targetBoundingT1.X *= -1;
+				targetBoundingT2.X *= -1;
+				targetBoundingT3.X *= -1;
+				targetBoundingT4.X *= -1;
+			}
+			if (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Vertical)
+			{
+				targetBoundingT1.Y *= -1;
+				targetBoundingT2.Y *= -1;
+				targetBoundingT3.Y *= -1;
+				targetBoundingT4.Y *= -1;
+			}
+
+			var expandTargetBoundTopLeft = new Vector2
             (
                 MathF.Min(MathF.Min(targetBoundingT1.X, targetBoundingT2.X), MathF.Min(targetBoundingT3.X, targetBoundingT4.X)),
                 MathF.Min(MathF.Min(targetBoundingT1.Y, targetBoundingT2.Y), MathF.Min(targetBoundingT3.Y, targetBoundingT4.Y))
             ) + structure.data.targetPoint;
 
-			targetBoundBottomRight = new Vector2
+			var expandTargetBoundBottomRight = new Vector2
             (
                 MathF.Max(MathF.Max(targetBoundingT1.X, targetBoundingT2.X), MathF.Max(targetBoundingT3.X, targetBoundingT4.X)),
                 MathF.Max(MathF.Max(targetBoundingT1.Y, targetBoundingT2.Y), MathF.Max(targetBoundingT3.Y, targetBoundingT4.Y))
@@ -374,15 +449,28 @@ namespace ImmersiveProjector
 
 			var targetTopLeft = new Vector2
             (
-                MathF.Max(targetBoundTopLeft.X, structure.data.targetTopLeft.X),
-                MathF.Max(targetBoundTopLeft.Y, structure.data.targetTopLeft.Y)
+                MathF.Max(expandTargetBoundTopLeft.X, structure.data.targetTopLeft.X),
+                MathF.Max(expandTargetBoundTopLeft.Y, structure.data.targetTopLeft.Y)
             );
 
 			var targetBottomRight = new Vector2
             (
-                MathF.Min(targetBoundBottomRight.X, structure.data.targetBottomRight.X),
-                MathF.Min(targetBoundBottomRight.Y, structure.data.targetBottomRight.Y)
+                MathF.Min(expandTargetBoundBottomRight.X, structure.data.targetBottomRight.X),
+                MathF.Min(expandTargetBoundBottomRight.Y, structure.data.targetBottomRight.Y)
             );
+
+			// Rounding down top-left corner to ensure that the clipped area is aligned
+			// otherwise there would be annoying sub-pixel glitches
+
+			// This is quite complex since this mod implement rendering in 2 different mode
+			// if the target scale is greater than 1, a render target of the size of source area is used and then scaled up to draw
+			// if the target scale is less than 1, a render target of the size of target area is used. 
+			bool expandFlag = (structure.data.targetScale >= 1.0f);
+			float align = expandFlag ?
+				1 * structure.data.targetScale : // 1 pixel in source rect
+				2; // 2 pixels in target rect
+            targetTopLeft = (targetTopLeft - structure.data.targetTopLeft) / align;
+            targetTopLeft = new Vector2(MathF.Floor(targetTopLeft.X), MathF.Floor(targetTopLeft.Y)) * align + structure.data.targetTopLeft;
 
 			targetSize = targetBottomRight - targetTopLeft;
 			if (targetSize.X <= 0 || targetSize.Y <= 0)
@@ -391,6 +479,46 @@ namespace ImmersiveProjector
 			var sourceTopLeft = (targetTopLeft - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
 			var sourceBottomRight = (targetBottomRight - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
 			var sourceSize = sourceBottomRight - sourceTopLeft;
+			var sourceFollowOffset = Vector2.Zero;
+
+			switch (structure.data.sourceFollow)
+			{
+				case (int)ProjectorData.FollowingFlag.Player:
+					for (var i = 0; i < Main.player.Length; i++)
+					{
+						var player = Main.player[(i + (int)(structure.data.sourceFollowId * Main.player.Length)) % Main.npc.Length];
+						if (player.active)
+						{
+							sourceFollowOffset = -structure.data.sourcePoint + player.Center;
+							break;
+						}
+					}
+					break;
+				case (int)ProjectorData.FollowingFlag.Boss:
+					for (var i = 0; i < Main.npc.Length; i++)
+					{
+						var npc = Main.npc[(i + (int)(structure.data.sourceFollowId * Main.npc.Length)) % Main.npc.Length];
+						if (npc.active && npc.boss)
+						{
+							sourceFollowOffset = -structure.data.sourcePoint + npc.Center;
+							break;
+						}
+					}
+					break;
+				case (int)ProjectorData.FollowingFlag.TownNPC:
+					for (var i = 0; i < Main.npc.Length; i++)
+					{
+						var npc = Main.npc[(i + (int)(structure.data.sourceFollowId * Main.npc.Length)) % Main.npc.Length];
+						if (npc.active && npc.townNPC)
+						{
+							sourceFollowOffset = -structure.data.sourcePoint + npc.Center;
+							break;
+						}
+					}
+					break;
+			}
+			sourceTopLeft += sourceFollowOffset;
+			sourceBottomRight += sourceFollowOffset;
 			
 			// The code above is to calculate clipped bounding rect on the *source* area
 			// which is a minimum rect that contains all pixels that contribute to the visible target pixels after rotation
@@ -428,12 +556,19 @@ namespace ImmersiveProjector
 			FieldInfo _activeEngineInfo = typeof(Lighting).GetField("_activeEngine", BindingFlags.Static | BindingFlags.NonPublic);
 			var origActiveEngine = _activeEngineInfo.GetValue(null);
 
+			var origLiquidRenderer = LiquidRenderer.Instance;
+			LiquidRenderer.Instance = projectorLiquidRenderer;
+
 			GraphicsDevice graphicDevice = Main.graphics.GraphicsDevice;
 
 			// Lighting.Mode = LightMode.Color;
 
 			Rectangle lightingArea = new Rectangle(Math.Max(5, (int)(sourceTopLeft.X / 16)), Math.Max(5, (int)(sourceTopLeft.Y / 16)),
 												   (int)(sourceSize.X / 16) + 1, (int)(sourceSize.Y / 16) + 1);
+            Rectangle liquidArea = new Rectangle(Math.Max(5, lightingArea.X - 1) - 2, Math.Max(5, lightingArea.Y - 1),
+                                                 Math.Min(Main.maxTilesX - 5 - lightingArea.X, lightingArea.Width + 3) + 2,
+                                                 Math.Min(Main.maxTilesY - 5 - lightingArea.Y, lightingArea.Height + 6) + 4);
+            // These magical numbers cannot be changed for some reason
 
 			ILightingEngine currentEngine = origLightingMode == LightMode.Color ? projectorLightingEngine : projectorLegacyLighting;
 			projectorLegacyLighting.Mode = Lighting.LegacyEngine.Mode;
@@ -486,7 +621,6 @@ namespace ImmersiveProjector
 			}
 
 
-			bool expandFlag = (structure.data.targetScale >= 1.0f);
 
 			if (expandFlag)
 				EnsureProjectorRT(sourceSize.X, sourceSize.Y);
@@ -545,6 +679,7 @@ namespace ImmersiveProjector
 
 			if (structure.data.captureCreature == (int)ProjectorData.CaptureCreatureFlag.All)
 			{
+				// MoonMoon NPCs
                 if (!expandFlag)
                 {
                     Main.GameViewMatrix.SetViewportOverride(new Viewport(0, 0, (int)(sourceSize.X), (int)(sourceSize.Y)));
@@ -556,6 +691,28 @@ namespace ImmersiveProjector
 				Main.spriteBatch.End();
                 Main.GameViewMatrix = new Terraria.Graphics.SpriteViewMatrix(Main.graphics.GraphicsDevice);
                 Main.screenPosition = sourceTopLeft;
+			}
+
+			if (structure.data.captureSolid == (int)ProjectorData.CaptureSolidFlag.All)
+			{
+				// Liquid 1
+				projectorLiquidProcessing = true;
+				projectorLiquidToScale = expandFlag ? 1f : structure.data.targetScale + 0.01f;
+                if (!expandFlag)
+                {
+                    Main.GameViewMatrix.SetViewportOverride(new Viewport(0, 0, (int)(sourceSize.X), (int)(sourceSize.Y)));
+                    Main.GameViewMatrix.Zoom = Vector2.One * structure.data.targetScale;
+                    Main.screenPosition = sourceTopLeft + sourceSize * 0.5f * (-1f + 1f / structure.data.targetScale);
+                }
+				LiquidRenderer.Instance.PrepareDraw(liquidArea);
+				Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
+					Main.Rasterizer, null, Matrix.CreateScale(projectorLiquidToScale));
+				LiquidRenderer.Instance.Draw(Main.spriteBatch, -sourceTopLeft, Main.waterStyle, Main.liquidAlpha[Main.waterStyle], true);
+				Main.spriteBatch.End();
+				projectorLiquidProcessing = false;
+                Main.GameViewMatrix = new Terraria.Graphics.SpriteViewMatrix(Main.graphics.GraphicsDevice);
+                Main.screenPosition = sourceTopLeft;
+				// LiquidRenderer.Instance.Draw(Main.spriteBatch, -sourceTopLeft, Main.waterStyle, Main.liquidAlpha[Main.waterStyle], false);
 			}
 
 			if (structure.data.captureWall == (int)ProjectorData.CaptureWallFlag.TileWall)
@@ -678,7 +835,7 @@ namespace ImmersiveProjector
 				Main.spriteBatch.Begin(SpriteSortMode.BackToFront, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
 					Main.Rasterizer, null, expandFlag ? Matrix.Identity : Matrix.CreateScale(structure.data.targetScale));
 				projectorTileDrawing.Draw(true, false /* Unused */, false, -1);
-				HackSpriteBatchScale(Main.spriteBatch, 1 + 0.1f / 16f / structure.data.targetScale);
+				HackSpriteBatchScale(Main.spriteBatch, 1 + 0.5f / 16f / structure.data.targetScale);
 				Main.spriteBatch.End();
 			}
 
@@ -750,11 +907,7 @@ namespace ImmersiveProjector
 
 			if (structure.data.captureSolid == (int)ProjectorData.CaptureSolidFlag.All)
 			{
-				Rectangle liquidArea = new Rectangle(Math.Max(5, lightingArea.X - 1) - 2, Math.Max(5, lightingArea.Y - 1),
-													 Math.Min(Main.maxTilesX - 5 - lightingArea.X, lightingArea.Width + 3) + 2,
-													 Math.Min(Main.maxTilesY - 5 - lightingArea.Y, lightingArea.Height + 6) + 4);
-				// These magical numbers cannot be changed for some reason
-				// Liquid
+				// Liquid 2
 				projectorLiquidProcessing = true;
 				projectorLiquidToScale = expandFlag ? 1f : structure.data.targetScale + 0.01f;
                 if (!expandFlag)
@@ -763,7 +916,6 @@ namespace ImmersiveProjector
                     Main.GameViewMatrix.Zoom = Vector2.One * structure.data.targetScale;
                     Main.screenPosition = sourceTopLeft + sourceSize * 0.5f * (-1f + 1f / structure.data.targetScale);
                 }
-				LiquidRenderer.Instance.PrepareDraw(liquidArea);
 				Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
 					Main.Rasterizer, null, Matrix.CreateScale(projectorLiquidToScale));
 				LiquidRenderer.Instance.Draw(Main.spriteBatch, -sourceTopLeft, Main.waterStyle, Main.liquidAlpha[Main.waterStyle], true);
@@ -807,6 +959,8 @@ namespace ImmersiveProjector
 			Main.renderCount = origRenderCount;
 			_activeEngineInfo.SetValue(null, origActiveEngine);
 
+			LiquidRenderer.Instance = origLiquidRenderer;
+
 			Main.mapDelay = origMapDelay;
 			Main.mapTime = origMapTime;
 			Main.screenLastPosition = origScreenLastPosition;
@@ -843,17 +997,43 @@ namespace ImmersiveProjector
 				new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB, alpha):
 				new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB) * alpha;
 
-			Vector2 ori = expandFlag ? structure.data.sourcePoint - sourceTopLeft : structure.data.targetPoint - targetTopLeft;
+			Vector2 ori = structure.data.targetPoint - targetTopLeft;
+			var scale = structure.data.targetScale;
 			if (expandFlag)
-				Main.spriteBatch.Draw(projectorRT, targetTopLeft - Main.screenPosition + ori * structure.data.targetScale + effectOffset, new Rectangle(0, 0, (int)sourceSize.X, (int)sourceSize.Y), color,
-					rotation, ori, structure.data.targetScale, flip, 0);
+			{
+				var offsetFlip = new Vector2
+				(
+					flip == SpriteEffects.FlipHorizontally ? structure.data.targetSize.X - MathF.Ceiling(sourceSize.X) * scale + 2 * (structure.data.targetTopLeft.X - targetTopLeft.X) : 0,
+					flip == SpriteEffects.FlipVertically ? structure.data.targetSize.Y - MathF.Ceiling(sourceSize.Y) * scale + 2 * (structure.data.targetTopLeft.Y - targetTopLeft.Y) : 0
+				);
+				offsetFlip = offsetFlip.RotatedBy(structure.data.targetRotation / 180f * MathF.PI);
+				Main.spriteBatch.Draw(projectorRT, targetTopLeft - Main.screenPosition + ori + offsetFlip + effectOffset, new Rectangle(0, 0, (int)Math.Ceiling(sourceSize.X), (int)Math.Ceiling(sourceSize.Y)), color,
+					rotation, ori / structure.data.targetScale, structure.data.targetScale, flip, 0);
+			}
 			else
-				Main.spriteBatch.Draw(projectorRT, targetTopLeft - Main.screenPosition + ori + effectOffset, new Rectangle(0, 0, (int)targetSize.X, (int)targetSize.Y), color,
+			{
+				var offsetFlip = new Vector2
+				(
+					flip == SpriteEffects.FlipHorizontally ? structure.data.targetSize.X - MathF.Ceiling(targetSize.X) + 2 * (structure.data.targetTopLeft.X - targetTopLeft.X) : 0,
+					flip == SpriteEffects.FlipVertically ? structure.data.targetSize.Y - MathF.Ceiling(targetSize.Y) + 2 * (structure.data.targetTopLeft.Y - targetTopLeft.Y) : 0
+				);
+				offsetFlip = offsetFlip.RotatedBy(structure.data.targetRotation / 180f * MathF.PI);
+				Main.spriteBatch.Draw(projectorRT, targetTopLeft - Main.screenPosition + ori + offsetFlip + effectOffset, new Rectangle(0, 0, (int)Math.Ceiling(targetSize.X), (int)Math.Ceiling(targetSize.Y)), color,
 					rotation, ori, 1.0f, flip, 0);
+			}
 			// Main.spriteBatch.Draw(projectorRT, targetTopLeft - Main.screenPosition,  Color.White);
 
 			// QuickDrawBoxLocal(Vector2.One * 400, new Vector2(Main.screenWidth, Main.screenHeight) - Vector2.One * 800, Color.White);
             Main.spriteBatch.End();
+			if (targetFollowOffset.Length() > 0 || sourceFollowOffset.Length() > 0)
+			{
+				findingTargetFlag = true;
+				structure.data.sourcePoint += sourceFollowOffset;
+				DrawStructureFrame();
+				findingTargetFlag = false;
+				structure.data.sourcePoint -= sourceFollowOffset;
+				structure.data.targetPoint -= targetFollowOffset;
+			}
 		}
 
 		public void DrawStructureFrame()
@@ -879,7 +1059,7 @@ namespace ImmersiveProjector
 			{
                 Main.spriteBatch.Begin(SpriteSortMode.Texture, BlendState.AlphaBlend,
                     Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
-				var color = structure.TurnedOn() ? new Color(1, 0.95f, 0.3f) * 0.8f : Color.Red * 0.5f;
+				var color = structure.TurnedOn() ? (findingTargetFlag ? Color.LightGreen * 0.5f : new Color(1, 0.95f, 0.3f) * 0.8f) : Color.Red * 0.5f;
 				QuickDrawBox(structure.sourceTopLeft, structure.data.sourceSize, color);
 				QuickDrawBox(structure.targetTopLeft, structure.data.targetSize, color);
 				QuickDrawBox(targetBoundTopLeft, targetBoundingR * 2, color);
@@ -1045,12 +1225,11 @@ namespace ImmersiveProjector
 		{
 			foreach (var s in projectorList)
 			{
-				var te = TileEntity.ByPosition[new Point16(s.tilePosition.X, s.tilePosition.Y)];
+				TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
 				if (te != null && te is ProjectorTileEntity entity)
 				{
 					if (entity.projectorInstance != s)
 					{
-						Main.NewText("Mismatched");
 						continue;
 					}
 					if (entity.TurnedOn && s.data.layer == layerFlag && !TestProjectorOutOfScreen(s))
@@ -1073,12 +1252,11 @@ namespace ImmersiveProjector
 			List<ProjectorInstance> drawList = new List<ProjectorInstance>();
 			foreach (var s in projectorList)
 			{
-				var te = TileEntity.ByPosition[new Point16(s.tilePosition.X, s.tilePosition.Y)];
-				if (te != null && te is ProjectorTileEntity entity)
+				TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
+				if (te != null && te is ProjectorTileEntity entity && entity.projectorInstance != null)
 				{
 					if (entity.projectorInstance != s)
 					{
-						Main.NewText("Mismatched");
 						continue;
 					}
 					if (entity.TurnedOn && s.data.layer == layerFlag)
@@ -1130,6 +1308,26 @@ namespace ImmersiveProjector
 			// Copy pee frame lights from vanilla updates
 			FieldInfo engineInfo = typeof(Lighting).GetField("NewEngine", BindingFlags.Static | BindingFlags.NonPublic);
 			SavePerframeLightsFrom((LightingEngine)engineInfo.GetValue(null));
+
+			ListInWorld.RemoveAll((ProjectorInstance s) =>
+			{
+				TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
+				if (te != null && te is ProjectorTileEntity entity)
+				{
+					if (entity.projectorInstance == null)
+					{
+						entity.projectorInstance = s;
+						return false;
+					}
+					if (entity.projectorInstance != s)
+					{
+						if (ImmersiveProjector.DEBUG_MODE)
+                            Main.NewText("TileEntity Mismatched {0} vs {1}".FormatWith(s.GetHashCode(), entity.projectorInstance.GetHashCode()));
+						return true;
+					}
+				}
+				return false;
+			});
 		}
 
 		public void SavePerframeLightsFrom(LightingEngine engine)

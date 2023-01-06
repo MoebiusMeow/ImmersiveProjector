@@ -54,12 +54,16 @@ namespace ImmersiveProjector.DataStructure
 
         public bool TurnedOn()
         {
-			if (data == null) return false;
+			if (data == null)
+                return false;
+            return data.turnedOn > 0;
+            /*
 			if (!TileEntity.ByPosition.TryGetValue(tilePosition.ToVector2().ToPoint16(), out var te))
 				return false;
 			if (!(te is ProjectorTileEntity entity))
 				return false;
             return entity.TurnedOn;
+            */
         }
         /*
         static public ProjectorInstance CreateInstance(List<ProjectorInstance> pool)

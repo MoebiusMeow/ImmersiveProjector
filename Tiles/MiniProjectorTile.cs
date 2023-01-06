@@ -11,6 +11,7 @@ using Terraria.DataStructures;
 using Terraria.Enums;
 using Terraria.GameContent.ObjectInteractions;
 using Terraria.ID;
+using Terraria.Localization;
 using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
 using Terraria.ObjectData;
@@ -29,7 +30,6 @@ namespace ImmersiveProjector.Tiles
 			TileID.Sets.DisableSmartCursor[Type] = true;
 
 			TileObjectData.newTile.CopyFrom(TileObjectData.StyleSwitch);
-			// We set processedCoordinates to true so our Hook_AfterPlacement gets top left coordinates, regardless of Origin.
 			var placementHook = new PlacementHook(ModContent.GetInstance<ProjectorTileEntity>().Hook_AfterPlacement, -1, 0, true);
 			TileObjectData.newTile.HookPostPlaceMyPlayer = placementHook;
 			TileObjectData.newTile.StyleHorizontal = true;
@@ -59,9 +59,7 @@ namespace ImmersiveProjector.Tiles
 			TileObjectData.addAlternate(3);
 
 			TileObjectData.addTile(Type);
-			ModTranslation name = CreateMapEntryName();
-			name.SetDefault(ImmersiveProjector.ModTranslate("MiniProjector", "ItemName."));
-			AddMapEntry(Microsoft.Xna.Framework.Color.Aqua, name);
+			AddMapEntry(Microsoft.Xna.Framework.Color.Aqua, ImmersiveProjector.ModTranslateL("MiniProjectorTile", "MapObject."));
 		}
 
 		public override void ModifySmartInteractCoords(ref int width, ref int height, ref int frameWidth, ref int frameHeight, ref int extraY)
@@ -96,10 +94,16 @@ namespace ImmersiveProjector.Tiles
 		{
 			Tile tile = Main.tile[i, j];
 			int style = tile.TileFrameY / 18;
-			tile.TileFrameY = (short)((style ^ 1) * 18);
 			TileEntity.ByPosition.TryGetValue(new Point16(i, j), out TileEntity te);
+			if (te is ProjectorTileEntity p)
+				style = p.data.turnedOn;
+
+			tile.TileFrameY = (short)((style ^ 1) * 18);
+
 			if (te is ProjectorTileEntity projector)
 			{
+				projector.data.turnedOn = (tile.TileFrameY >= 18).ToInt();
+				projector.MarkNetUpdate();
 				// UISystem.Instance.userInterface.SetState(UISystem.Instance.projectorUIState);
 			}
 		}

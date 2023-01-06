@@ -106,6 +106,11 @@ namespace ImmersiveProjector.UI
 				var sys = ModContent.GetInstance<ProjectorSystem>();
 				sys.QuickDrawBoxLocal((projector.data.sourceTopLeft - topLeft * 16) / 16 * scale + current.TopLeft(), projector.data.sourceSize / 16 * scale, Color.Cyan);
 				sys.QuickDrawBoxLocal((projector.data.targetTopLeft - topLeft * 16) / 16 * scale + current.TopLeft(), projector.data.targetSize / 16 * scale, Color.Orange);
+				var playerTopLeft = Main.LocalPlayer.TopLeft;
+				playerTopLeft = new Vector2(MathF.Max(playerTopLeft.X, topLeft.X * 16 + 10), MathF.Max(playerTopLeft.Y, topLeft.Y * 16 + 10));
+				var playerBottomRight = Main.LocalPlayer.BottomRight;
+				playerBottomRight = new Vector2(MathF.Min(playerBottomRight.X, bottomRight.X * 16 - 10), MathF.Min(playerBottomRight.Y, bottomRight.Y * 16 - 10));
+				sys.QuickDrawBoxLocal((playerTopLeft - topLeft * 16) / 16 * scale + current.TopLeft(), (playerBottomRight - playerTopLeft) / 16 * scale, Color.LightGreen);
 				sys.QuickDashLineLocal
                 (
                     (projector.data.sourcePoint - topLeft * 16) / 16 * scale + current.TopLeft(),
