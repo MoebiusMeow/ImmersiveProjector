@@ -82,6 +82,7 @@ namespace ImmersiveProjector.UI
 		public void SetFromAnchorAndSize(Vector2 anchorPosition, Vector2 anchorPrecentage, Vector2 size)
 		{
 			anchorPosition -= (anchorPrecentage - Vector2.One * 0.5f) * size;
+			// anchorPosition = 8 * new Vector2(MathF.Round(anchorPosition.X / 8), MathF.Round(anchorPosition.Y / 8));
 			anchorPrecentage = Vector2.One * 0.5f;
 			this.anchorPosition = anchorPosition;
 			this.topLeft = anchorPosition - size * anchorPrecentage;
@@ -119,8 +120,8 @@ namespace ImmersiveProjector.UI
 				if (transformType == TransformType.ScaleAndMove)
 				{
                     Vector2 newSize = (bottomRight - topLeft) * 2 - oldSize;
-                    newSize.X = MathF.Max(newSize.X, MathF.Max(8, 2 * snapping));
-                    newSize.Y = MathF.Max(newSize.Y, MathF.Max(8, 2 * snapping));
+                    newSize.X = MathF.Max(newSize.X, MathF.Max(16, 2 * snapping));
+                    newSize.Y = MathF.Max(newSize.Y, MathF.Max(16, 2 * snapping));
 					draggingExpanding = newSize.X * newSize.Y > oldSize.X * oldSize.Y;
                     float factor = MathF.Max(dragging.styleX == 1 ? 0 : newSize.X / oldSize.X, dragging.styleY == 1 ? 0 : newSize.Y / oldSize.Y);
 					Debug.Assert(factor > 0);
@@ -131,16 +132,16 @@ namespace ImmersiveProjector.UI
 					if (Main.LocalPlayer.controlSmart)
 					{
                         Vector2 newSize = (bottomRight - topLeft) * 2 - oldSize;
-                        newSize.X = MathF.Max(newSize.X, MathF.Max(8, 2 * snapping));
-                        newSize.Y = MathF.Max(newSize.Y, MathF.Max(8, 2 * snapping));
+                        newSize.X = MathF.Max(newSize.X, MathF.Max(16, 2 * snapping));
+                        newSize.Y = MathF.Max(newSize.Y, MathF.Max(16, 2 * snapping));
                         draggingExpanding = newSize.X * newSize.Y > oldSize.X * oldSize.Y;
                         SetFromAnchorAndSize(buttons[1, 1].inGamePosition, Vector2.One * 0.5f, newSize);
 					}
 					else
 					{
                         Vector2 newSize = (bottomRight - topLeft);
-                        newSize.X = MathF.Max(newSize.X, MathF.Max(8, 2 * snapping));
-                        newSize.Y = MathF.Max(newSize.Y, MathF.Max(8, 2 * snapping));
+                        newSize.X = MathF.Max(newSize.X, MathF.Max(16, 2 * snapping));
+                        newSize.Y = MathF.Max(newSize.Y, MathF.Max(16, 2 * snapping));
                         draggingExpanding = newSize.X * newSize.Y > oldSize.X * oldSize.Y;
                         SetFromAnchorAndSize(buttons[2 - dragging.styleX, 2 - dragging.styleY].inGamePosition,
 											 new Vector2(2 - dragging.styleX, 2 - dragging.styleY) * 0.5f, newSize);

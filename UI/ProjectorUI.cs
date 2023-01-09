@@ -835,7 +835,7 @@ namespace ImmersiveProjector.UI
 						MathF.Min(targetGrid.Size.X / sourceGrid.Size.X, targetGrid.Size.Y / sourceGrid.Size.Y);
 					*/
 					if (targetGrid.buttons[targetGrid.draggingStyleX, targetGrid.draggingStyleY].dragging)
-                        focusedInstance.data.targetScale = MathF.Min(targetGrid.Size.X / sourceGrid.Size.X, targetGrid.Size.Y / sourceGrid.Size.Y);
+                        focusedInstance.data.targetScale = MathF.Max(0.25f, MathF.Min(targetGrid.Size.X / sourceGrid.Size.X, targetGrid.Size.Y / sourceGrid.Size.Y));
                     targetGrid.SetFromAnchorAndSize(focusedInstance.data.targetPoint, focusedInstance.data.anchor, focusedInstance.data.targetSize);
 				}
 				sourceGrid.UpdateHandlePositions();
