@@ -85,10 +85,6 @@ namespace ImmersiveProjector.UI
 				if (styleY == 2) inGamePosition.Y = MathF.Max(inGamePosition.Y, group.topLeft.Y + snapping);
 				group.FromHandlePositions(this);
 			}
-			if (group != null)
-			{
-				Color = group.transformType == HandleGridGroup.TransformType.FreeTransform ? Color.White : Color.Orange;
-			}
 
             Left.Pixels = ((inGamePosition.X - screenPosition.X ) * Main.GameZoomTarget + zoomOffset.X) / Main.UIScale; 
             Top.Pixels = ((inGamePosition.Y - screenPosition.Y) * Main.GameZoomTarget + zoomOffset.Y) / Main.UIScale;

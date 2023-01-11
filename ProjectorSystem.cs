@@ -30,6 +30,8 @@ using System.Linq.Expressions;
 using Humanizer;
 using Terraria.IO;
 using System.Threading;
+using MonoMod.Cil;
+using Mono.Cecil.Cil;
 
 namespace ImmersiveProjector
 {
@@ -49,12 +51,15 @@ namespace ImmersiveProjector
         public TileDrawing projectorTileDrawing;
 
         // Dust and Gore
+        // store dusts and gores in any projector area
         public Dust[] projectorDust;
         public Gore[] projectorGore;
+        // Temporary buffer to for UpdateDust
+        public Dust[] tempDustBuffer;
 
         // Lighting
         // Create new lighting engines
-        public LightingEngine projectorLightingEngine = new LightingEngine();
+        // public LightingEngine projectorLightingEngine = new LightingEngine();
         public LegacyLighting projectorLegacyLighting = new LegacyLighting(Main.Camera);
         private bool legacyLightingRebuilt;
         public IList perFrameLightList = null;
@@ -67,6 +72,16 @@ namespace ImmersiveProjector
         // Hook flag
         private bool projectorProcessing = false;
 
+        // When processing UpdateDust
+        // ban NewDust from being called
+        private bool banNewDust = false;
+        // also change DustUpdate to return as soon as Main.maxDustToDraw is reached
+        private bool overrideDustUpdate = false;
+        private List<Dust> workingDustIdentityList = null;
+        // temp list to store newly created per-frame dusts
+        public List<Dust> tempDustIdentityList = null;
+
+        // Only for UI color
         private bool findingTargetFlag = false;
 
         public UISystem uiSystem { get => ModContent.GetInstance<UISystem>(); }
@@ -77,6 +92,7 @@ namespace ImmersiveProjector
         public Effect projectorRangeDisplayEffect;
 
         public Action<SpriteBatch> delayedSpriteDraw;
+
 
         // For faster reflection
         // WIP
@@ -160,19 +176,27 @@ namespace ImmersiveProjector
         {
             inited = false;
             // Lighting.Mode = LightMode.Color;
-            projectorLightingEngine.Rebuild();
+            // projectorLightingEngine.Rebuild();
             projectorLegacyLighting.Rebuild();
             projectorDust = new Dust[6002];
+            tempDustBuffer = new Dust[6002];
             projectorGore = new Gore[602];
+            tempDustIdentityList = new List<Dust>();
             for (int i = 0; i <= 6000; i++)
             {
                 projectorDust[i] = new Dust();
                 projectorDust[i].dustIndex = i;
             }
+            // Really need this
+            // or the game will crash due to null ref
+            // from dusts that creates new dusts during update
+            // such as RoD dusts
+            tempDustBuffer[Main.maxDust] = new Dust();
+            tempDustBuffer[Main.maxDust].dustIndex = Main.maxDust;
             for (int i = 0; i <= 600; i++)
                 projectorGore[i] = new Gore();
 
-            projectorList = new List<ProjectorInstance>();
+            projectorList.Clear();
             base.OnWorldLoad();
 
             /*
@@ -198,15 +222,15 @@ namespace ImmersiveProjector
             On.Terraria.Lighting.GetColor_int_int += LightColorDecorator;
             On.Terraria.Graphics.TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects += TileBatchDrawDecorator;
             On.Terraria.Graphics.TileBatch.InternalDraw += TileBatchInternalDrawDecorator;
+            On.Terraria.Main.DoDraw += DoDrawDecorator;
             On.Terraria.Main.DrawCachedNPCs += DrawCachedNPCsDecorator;
             On.Terraria.Lighting.Initialize += LightingInitializeDecorator;
+            On.Terraria.Dust.NewDust += NewDustDecorator;
+            On.Terraria.Graphics.Light.LightingEngine.AddLight += AddLightDecorator;
+            IL.Terraria.Dust.UpdateDust += UpdateDustILEdit;
             legacyLightingRebuilt = false;
             // var info = typeof(Main).GetProperty("tile", BindingFlags.Static | BindingFlags.Public);
             base.Load();
-        }
-
-        public void TileGetterOverride()
-        {
         }
 
         public override void OnModLoad()
@@ -225,8 +249,12 @@ namespace ImmersiveProjector
             On.Terraria.Lighting.GetColor_int_int -= LightColorDecorator;
             On.Terraria.Graphics.TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects -= TileBatchDrawDecorator;
             On.Terraria.Graphics.TileBatch.InternalDraw -= TileBatchInternalDrawDecorator;
+            On.Terraria.Main.DoDraw -= DoDrawDecorator;
             On.Terraria.Main.DrawCachedNPCs -= DrawCachedNPCsDecorator;
             On.Terraria.Lighting.Initialize -= LightingInitializeDecorator;
+            On.Terraria.Dust.NewDust -= NewDustDecorator;
+            On.Terraria.Graphics.Light.LightingEngine.AddLight -= AddLightDecorator;
+            IL.Terraria.Dust.UpdateDust -= UpdateDustILEdit;
             base.Unload();
         }
 
@@ -335,10 +363,10 @@ namespace ImmersiveProjector
             Main.spriteBatch.End();
         }
 
-        public void HookedDraw(ProjectorInstance structure)
+        public bool CalculateClippedArea(ProjectorInstance structure, out bool hitFlag, out Vector2 targetTopLeft, out Vector2 targetBottomRight, out Vector2 targetFollowOffset)
         {
             var targetSize = structure.data.targetSize;
-            var targetFollowOffset = Vector2.Zero;
+            targetFollowOffset = Vector2.Zero;
 
             switch (structure.data.targetFollow)
             {
@@ -395,42 +423,35 @@ namespace ImmersiveProjector
                  targetBoundTopLeft.Y > Main.screenPosition.Y + Main.screenHeight || targetBoundBottomRight.Y < Main.screenPosition.Y))
             {
                 structure.data.targetPoint -= targetFollowOffset;
-                return;
+                hitFlag = false;
+                targetTopLeft = targetBottomRight = Vector2.Zero;
+                return false;
             }
 
-            var hitFlag = (targetBoundTopLeft.X < Main.LocalPlayer.position.X + Main.LocalPlayer.width && targetBoundBottomRight.X > Main.LocalPlayer.position.X
-                        && targetBoundTopLeft.Y < Main.LocalPlayer.position.Y + Main.LocalPlayer.height && targetBoundBottomRight.Y > Main.LocalPlayer.position.Y);
-            if (structure.data.behavior != (int)ProjectorData.BehaviorFlag.None)
-            {
-                if (hitFlag)
-                    structure.fadingValue = Utils.Clamp(structure.fadingValue + 1 / 20f, 0, 1);
-                else
-                    structure.fadingValue = Utils.Clamp(structure.fadingValue - 1 / 15f, 0, 1);
-            }
-            else
-                structure.fadingValue = 0;
+            hitFlag = (targetBoundTopLeft.X < Main.LocalPlayer.position.X + Main.LocalPlayer.width && targetBoundBottomRight.X > Main.LocalPlayer.position.X
+                    && targetBoundTopLeft.Y < Main.LocalPlayer.position.Y + Main.LocalPlayer.height && targetBoundBottomRight.Y > Main.LocalPlayer.position.Y);
 
-            float clipL = Main.screenPosition.X + 00 - 4;
-            float clipT = Main.screenPosition.Y + 00 - 4;
-            float clipR = Main.screenPosition.X + Main.screenWidth + 00 + 4;
-            float clipB = Main.screenPosition.Y + Main.screenHeight + 00 + 4;
+            Vector2 clipTL = Main.Camera.ScaledPosition - Vector2.One * 4;
+            Vector2 clipBR = Main.Camera.ScaledPosition + Main.Camera.ScaledSize + Vector2.One * 4;
 
             targetBoundTopLeft = new Vector2
             (
-                MathF.Max(targetBoundTopLeft.X, clipL),
-                MathF.Max(targetBoundTopLeft.Y, clipT)
+                MathF.Max(targetBoundTopLeft.X, clipTL.X),
+                MathF.Max(targetBoundTopLeft.Y, clipTL.Y)
             );
 
             targetBoundBottomRight = new Vector2
             (
-                MathF.Min(targetBoundBottomRight.X, clipR),
-                MathF.Min(targetBoundBottomRight.Y, clipB)
+                MathF.Min(targetBoundBottomRight.X, clipBR.X),
+                MathF.Min(targetBoundBottomRight.Y, clipBR.Y)
             );
 
             if (targetBoundTopLeft.X > targetBoundBottomRight.X || targetBoundTopLeft.Y > targetBoundBottomRight.Y)
             {
                 structure.data.targetPoint -= targetFollowOffset;
-                return;
+                hitFlag = false;
+                targetTopLeft = targetBottomRight = Vector2.Zero;
+                return false;
             }
 
             Vector2 targetBoundingT1 = (targetBoundTopLeft - structure.data.targetPoint).RotatedBy(-structure.data.targetRotation / 180f * MathF.PI);
@@ -465,24 +486,18 @@ namespace ImmersiveProjector
                 MathF.Max(MathF.Max(targetBoundingT1.Y, targetBoundingT2.Y), MathF.Max(targetBoundingT3.Y, targetBoundingT4.Y))
             ) + structure.data.targetPoint;
 
-            var targetTopLeft = new Vector2
+            targetTopLeft = new Vector2
             (
                 MathF.Max(expandTargetBoundTopLeft.X, structure.data.targetTopLeft.X),
                 MathF.Max(expandTargetBoundTopLeft.Y, structure.data.targetTopLeft.Y)
             );
 
-            var targetBottomRight = new Vector2
+            targetBottomRight = new Vector2
             (
                 MathF.Min(expandTargetBoundBottomRight.X, structure.data.targetBottomRight.X),
                 MathF.Min(expandTargetBoundBottomRight.Y, structure.data.targetBottomRight.Y)
             );
 
-            // Rounding down top-left corner to ensure that the clipped area is aligned
-            // otherwise there would be annoying sub-pixel glitches
-
-            // This is quite complex since this mod implement rendering in 2 different mode
-            // if the target scale is greater than 1, a render target of the size of source area is used and then scaled up to draw
-            // if the target scale is less than 1, a render target of the size of target area is used. 
             bool expandFlag = (structure.data.targetScale >= 1.0f);
             float align = expandFlag ?
                 1 * structure.data.targetScale : // 1 pixel in source rect
@@ -492,12 +507,17 @@ namespace ImmersiveProjector
 
             targetSize = targetBottomRight - targetTopLeft;
             if (targetSize.X <= 0 || targetSize.Y <= 0)
-                return;
+                return false;
+            return true;
+        }
 
-            var sourceTopLeft = (targetTopLeft - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
-            var sourceBottomRight = (targetBottomRight - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
-            var sourceSize = sourceBottomRight - sourceTopLeft;
-            var sourceFollowOffset = Vector2.Zero;
+        public void CalculateSourceAreaFromCache(ProjectorInstance structure, out Vector2 sourceTopLeft, out Vector2 sourceBottomRight, out Vector2 sourceFollowOffset)
+        {
+            var targetTopLeft = structure.cacheTopLeft;
+            var targetBottomRight = structure.cacheBottomRight;
+            sourceTopLeft = (targetTopLeft - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
+            sourceBottomRight = (targetBottomRight - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
+            sourceFollowOffset = Vector2.Zero;
 
             switch (structure.data.sourceFollow)
             {
@@ -537,7 +557,43 @@ namespace ImmersiveProjector
             }
             sourceTopLeft += sourceFollowOffset;
             sourceBottomRight += sourceFollowOffset;
-            
+            structure.cacheSourceTopLeft = sourceTopLeft;
+            structure.cacheSourceBottomRight = sourceBottomRight;
+        }
+
+        public void HookedDraw(ProjectorInstance structure)
+        {
+            var targetTopLeft = structure.cacheTopLeft;
+            var targetBottomRight = structure.cacheBottomRight;
+            var targetFollowOffset = structure.cacheTargetOffset;
+            var hitFlag = structure.cacheHitFlag;
+            if (structure.data.behavior != (int)ProjectorData.BehaviorFlag.None)
+            {
+                if (hitFlag)
+                    structure.fadingValue = Utils.Clamp(structure.fadingValue + 1 / 20f, 0, 1);
+                else
+                    structure.fadingValue = Utils.Clamp(structure.fadingValue - 1 / 15f, 0, 1);
+            }
+            else
+                structure.fadingValue = 0;
+            // Rounding down top-left corner to ensure that the clipped area is aligned
+            // otherwise there would be annoying sub-pixel glitches
+
+            // This is quite complex since this mod implement rendering in 2 different mode
+            // if the target scale is greater than 1, a render target of the size of source area is used and then scaled up to draw
+            // if the target scale is less than 1, a render target of the size of target area is used. 
+            bool expandFlag = (structure.data.targetScale >= 1.0f);
+            float align = expandFlag ?
+                1 * structure.data.targetScale : // 1 pixel in source rect
+                2; // 2 pixels in target rect
+            targetTopLeft = (targetTopLeft - structure.data.targetTopLeft) / align;
+            targetTopLeft = new Vector2(MathF.Floor(targetTopLeft.X), MathF.Floor(targetTopLeft.Y)) * align + structure.data.targetTopLeft;
+
+            var targetSize = targetBottomRight - targetTopLeft;
+            Debug.Assert(targetSize.X > 0 && targetSize.Y > 0);
+
+            CalculateSourceAreaFromCache(structure, out Vector2 sourceTopLeft, out Vector2 sourceBottomRight, out Vector2 sourceFollowOffset);
+            var sourceSize = sourceBottomRight - sourceTopLeft;
             // The code above is to calculate clipped bounding rect on the *source* area
             // which is a minimum rect that contains all pixels that contribute to the visible target pixels after rotation
 
@@ -557,6 +613,7 @@ namespace ImmersiveProjector
             // Hook newly created dust and gore
             Main.dust = projectorDust;
             Main.gore = projectorGore;
+            workingDustIdentityList = structure.dustIdentities;
 
             // Try fixing White / Retro Lighting Mode
             // Be careful! The setter method of Light.Mode
@@ -588,6 +645,7 @@ namespace ImmersiveProjector
                                                  Math.Min(Main.maxTilesY - 5 - lightingArea.Y, lightingArea.Height + 6) + 4);
             // These magical numbers cannot be changed for some reason
 
+            var projectorLightingEngine = structure.lightingEngine;
             ILightingEngine currentEngine = origLightingMode == LightMode.Color ? projectorLightingEngine : projectorLegacyLighting;
             projectorLegacyLighting.Mode = Lighting.LegacyEngine.Mode;
 
@@ -629,13 +687,18 @@ namespace ImmersiveProjector
             {
                 WritePerframeLightsTo(projectorLightingEngine);
                 var stateInfo = typeof(LightingEngine).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
+                // SavePerframeLightsFrom(projectorLightingEngine);
                 // The first 2 states are
                 // EngineState.MinimapUpdate and EngineState.ExportMetrics
                 // we only use lighting engine to obtain lighting data
-                stateInfo.SetValue(projectorLightingEngine, 2);
-                // Finish the last 2 states (Scan and Blur)
-                for (int i = 0; i < 2; i++)
+                // stateInfo.SetValue(projectorLightingEngine, 2);
+                if ((int)stateInfo.GetValue(projectorLightingEngine) >= 2)
+                {
+                    // Finish the last 2 states (Scan and Blur)
                     currentEngine.ProcessArea(lightingArea);
+                }
+                else
+                    stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
             }
 
 
@@ -894,6 +957,12 @@ namespace ImmersiveProjector
                 // DrawSuperSpecialProjectiles(DrawCacheFirstFractals);
                 DrawCachedProjsMethod.Invoke(Main.instance, new object[] { Main.instance.DrawCacheProjsBehindProjectiles, true });
                 info = typeof(Main).GetMethod("DrawProjectiles", BindingFlags.Instance | BindingFlags.NonPublic);
+
+                Main.spriteBatch.Begin();
+                Main.ParticleSystem_World_BehindPlayers.Settings.AnchorPosition = -Main.screenPosition;
+                Main.ParticleSystem_World_BehindPlayers.Draw(Main.spriteBatch);
+                Main.spriteBatch.End();
+
                 info.Invoke(Main.instance, new object[] {  });
                 info = typeof(Main).GetMethod("DrawPlayers_AfterProjectiles", BindingFlags.Instance | BindingFlags.NonPublic);
                 info.Invoke(Main.instance, new object[] {  });
@@ -904,6 +973,11 @@ namespace ImmersiveProjector
                 DrawCachedNPCsMethod.Invoke(Main.instance, new object[] { Main.instance.DrawCacheNPCsOverPlayers, false});
                 Main.spriteBatch.End();
 
+                Main.spriteBatch.Begin();
+                Main.ParticleSystem_World_OverPlayers.Settings.AnchorPosition = -Main.screenPosition;
+                Main.ParticleSystem_World_OverPlayers.Draw(Main.spriteBatch);
+                Main.spriteBatch.End();
+
                 // DrawItems();
                 // FastInvoke(Main.instance, "DrawItems", new object[] { });
                 // DrawRain();
@@ -912,12 +986,28 @@ namespace ImmersiveProjector
                 // FastInvoke(Main.instance, "DrawGore", new object[] { });
 
                 // There is some problem causing DrawGore to fail (Perhaps IL stuffs)
+                Main.gore = origGore;
                 info = typeof(Main).GetMethod("DrawGore", BindingFlags.Instance | BindingFlags.NonPublic);
-                // info.Invoke(Main.instance, new object[] {  });
+                Main.spriteBatch.Begin();
+                info.Invoke(Main.instance, new object[] {  });
+                Main.gore = projectorGore;
+                info.Invoke(Main.instance, new object[] {  });
+                Main.spriteBatch.End();
+
                 // DrawDust();
                 // FastInvoke(Main.instance, "DrawDust", new object[] { });
+                // Main.dust = origDust;
                 info = typeof(Main).GetMethod("DrawDust", BindingFlags.Instance | BindingFlags.NonPublic);
+                // info.Invoke(Main.instance, new object[] {  });
+                Main.dust = tempDustBuffer;
+                var origMaxDust = Main.maxDustToDraw;
+                Main.maxDustToDraw = 0;
+                foreach (var i in structure.dustIdentities)
+                    tempDustBuffer[Main.maxDustToDraw++] = i;
+                banNewDust = true;
                 info.Invoke(Main.instance, new object[] {  });
+                banNewDust = false;
+                Main.maxDustToDraw = origMaxDust;
 
                 Main.GameViewMatrix = new Terraria.Graphics.SpriteViewMatrix(Main.graphics.GraphicsDevice);
                 Main.screenPosition = sourceTopLeft;
@@ -987,6 +1077,7 @@ namespace ImmersiveProjector
 
             Main.dust = origDust;
             Main.gore = origGore;
+            workingDustIdentityList = tempDustIdentityList;
 
             projectorProcessing = false;
 
@@ -1132,6 +1223,7 @@ namespace ImmersiveProjector
                     result.R = 1;
             return result;
         }
+
         public Color LightOverrideDecorator(On.Terraria.GameContent.Drawing.TileDrawing.orig_DrawTiles_GetLightOverride orig,
                                             TileDrawing self, int j, int i, Tile tileCache, ushort typeCache, short tileFrameX, short tileFrameY, Color tileLight)
         {
@@ -1139,12 +1231,67 @@ namespace ImmersiveProjector
             return result;
         }
 
+        public void AddLightDecorator(On.Terraria.Graphics.Light.LightingEngine.orig_AddLight orig, LightingEngine self, int x, int y, Vector3 color)
+        {
+            // Main.NewText("{0}, {1}, {2}".FormatWith(x, y, color));
+            orig(self, x, y, color);
+        }
+
+        public int NewDustDecorator(On.Terraria.Dust.orig_NewDust orig, Vector2 position, int width, int height, int type,
+                                    float speedX, float speedY, int alpha, Color color, float scale)
+        {
+            if (banNewDust)
+                return Main.maxDust;
+            var origPosition = position;
+            if (workingDustIdentityList == tempDustIdentityList)
+                position = Main.screenPosition;
+            int id = orig(position, width, height, type, speedX, speedY, alpha, color, scale);
+            Main.dust[id].position += origPosition - position;
+            if (workingDustIdentityList != null && id < Main.maxDust)
+                workingDustIdentityList.Add(Main.dust[id]);
+            return id;
+        }
+
+        public void UpdateDustILEdit(ILContext context)
+        {
+            ILCursor cursor = new ILCursor(context);
+            ILLabel elseBranch = null;
+            if (!cursor.TryGotoNext(i => i.MatchBge(out elseBranch)))
+                throw new Exception("Immersive Projector: Dust.UpdateDust hook location not found");
+            if (!cursor.Previous.MatchLdsfld(out var value))
+                throw new Exception("Immersive Projector: Dust.UpdateDust hook location not found");
+            // ILLabel afterLoop = cursor.DefineLabel();
+            ILLabel noReturn = cursor.DefineLabel();
+            cursor.GotoLabel(elseBranch);
+            cursor.EmitDelegate<Func<bool>>(() => { return this.overrideDustUpdate; });
+            cursor.Emit(OpCodes.Brfalse, noReturn);
+            cursor.Emit(OpCodes.Ret);
+            cursor.MarkLabel(noReturn);
+            // cursor.GotoNext(i => i.MatchBlt(out var label));
+            // cursor.GotoNext();
+            // cursor.MarkLabel(afterLoop);
+        }
+
         public void LightingInitializeDecorator(On.Terraria.Lighting.orig_Initialize orig)
         {
             orig();
             // Rebuild our lighting engine whenever the vanilla rebuild method is called
-            projectorLightingEngine.Rebuild();
+            // projectorLightingEngine.Rebuild();
             projectorLegacyLighting.Rebuild();
+            foreach (var projector in projectorList)
+                projector.lightingEngine.Rebuild();
+        }
+
+        public void DoDrawDecorator(On.Terraria.Main.orig_DoDraw orig, Main self, GameTime gameTime)
+        {
+            lock (projectorList)
+            {
+                foreach (var s in projectorList)
+                {
+                    s.cacheNeedDraw = false;
+                }
+            }
+            orig(self, gameTime);
         }
 
         public void DrawCachedNPCsDecorator(On.Terraria.Main.orig_DrawCachedNPCs orig, Main self,
@@ -1166,6 +1313,27 @@ namespace ImmersiveProjector
 
             if (drawLayer != -1)
             {
+                if (drawLayer == (int)ProjectorData.LayerFlag.BehindWalls)
+                    lock (projectorList)
+                    {
+                        foreach (var s in projectorList)
+                        {
+                            TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
+                            if (te != null && te is ProjectorTileEntity entity)
+                            {
+                                if (entity.projectorInstance != s)
+                                    continue;
+                                if (entity.TurnedOn && CalculateClippedArea(s, out var hitFlag, out var tl, out var br, out var to))
+                                {
+                                    s.cacheHitFlag = hitFlag;
+                                    s.cacheTopLeft = tl;
+                                    s.cacheBottomRight = br;
+                                    s.cacheTargetOffset = to;
+                                    s.cacheNeedDraw = true;
+                                }
+                            }
+                        }
+                    }
                 bool needDraw = TestNeedDrawProjectors(drawLayer);
                 if (needDraw)
                 {
@@ -1218,41 +1386,14 @@ namespace ImmersiveProjector
             orig(self, cachedList, behindTiles);
         }
 
-        public bool TestProjectorOutOfScreen(ProjectorInstance structure)
-        {
-            Vector2 targetBoundingR = structure.targetSize.RotatedBy(structure.data.targetRotation / 180f * MathF.PI) * 0.5f;
-            targetBoundingR.X = MathF.Abs(targetBoundingR.X);
-            targetBoundingR.Y = MathF.Abs(targetBoundingR.Y);
-            Vector2 targetBoundingR2 = (structure.targetSize * new Vector2(-1, 1)).RotatedBy(structure.data.targetRotation / 180f * MathF.PI) * 0.5f;
-            targetBoundingR2.X = MathF.Abs(targetBoundingR2.X);
-            targetBoundingR2.Y = MathF.Abs(targetBoundingR2.Y);
-            targetBoundingR.X = MathF.Max(targetBoundingR.X, targetBoundingR2.X);
-            targetBoundingR.Y = MathF.Max(targetBoundingR.Y, targetBoundingR2.Y);
-            Vector2 targetBoundTopLeft = structure.data.targetPoint - targetBoundingR;
-            Vector2 targetBoundBottomRight = structure.data.targetPoint + targetBoundingR;
-
-            // Target out of screen
-            if (uiSystem.projectorUIState.focusedInstance != structure &&
-                (targetBoundTopLeft.X > Main.screenPosition.X + Main.screenWidth || targetBoundBottomRight.X < Main.screenPosition.X ||
-                 targetBoundTopLeft.Y > Main.screenPosition.Y + Main.screenHeight || targetBoundBottomRight.Y < Main.screenPosition.Y))
-                return true;
-            return false;
-        }
-
         public bool TestNeedDrawProjectors(int layerFlag)
         {
             foreach (var s in projectorList)
             {
                 TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
                 if (te != null && te is ProjectorTileEntity entity)
-                {
-                    if (entity.projectorInstance != s)
-                    {
-                        continue;
-                    }
-                    if (entity.TurnedOn && s.data.layer == layerFlag && !TestProjectorOutOfScreen(s))
+                    if (s.data.layer == layerFlag && s.cacheNeedDraw)
                         return true;
-                }
             }
             return false;
         }
@@ -1277,7 +1418,7 @@ namespace ImmersiveProjector
                     {
                         continue;
                     }
-                    if (entity.TurnedOn && s.data.layer == layerFlag)
+                    if (s.cacheNeedDraw && s.data.layer == layerFlag)
                         drawList.Add(s);
                 }
             }
@@ -1287,7 +1428,7 @@ namespace ImmersiveProjector
             if (layerFlag == (int)ProjectorData.LayerFlag.Foreground)
             {
                 // Restore water cache
-                LiquidRenderer.Instance.PrepareDraw(drawArea);
+                // LiquidRenderer.Instance.PrepareDraw(drawArea);
             }
         }
 
@@ -1303,10 +1444,70 @@ namespace ImmersiveProjector
         public override void PreUpdateDusts()
         {
             var origDust = Main.dust;
+            var origDCount = Dust.dCount;
+            var origMaxDust = Main.maxDustToDraw;
+            var origScreenPosition = Main.screenPosition;
+            var origScreenWidth = Main.screenWidth;
+            var origScreenHeight = Main.screenHeight;
+            var origOffscreenRange = Main.offScreenRange;
+            FieldInfo _activeEngineInfo = typeof(Lighting).GetField("_activeEngine", BindingFlags.Static | BindingFlags.NonPublic);
+            var origActiveEngine = _activeEngineInfo.GetValue(null);
             Main.dust = projectorDust;
+            overrideDustUpdate = true;
             try
             {
-                Dust.UpdateDust();
+                foreach (var structure in projectorList)
+                    if (structure.cacheNeedDraw)
+                    {
+                        Main.maxDustToDraw = origMaxDust;
+                        Dust.dCount = origDCount;
+                        var topLeft = structure.cacheSourceTopLeft;
+                        var bottomRight = structure.cacheSourceBottomRight;
+                        var size = bottomRight - topLeft;
+                        Main.screenPosition = topLeft;
+                        Main.screenWidth = (int)size.X + 1;
+                        Main.screenHeight = (int)size.Y + 1;
+                        workingDustIdentityList = structure.dustIdentities;
+                        foreach (var dust in tempDustIdentityList)
+                            if (dust != null && dust.active)
+                            {
+                                int id = Dust.NewDust(dust.position, 0, 0, dust.type);
+                                if (id >= Main.maxDust)
+                                    continue;
+                                Dust newDust = Main.dust[id];
+                                newDust.position = dust.position;
+                                newDust.velocity = dust.velocity;
+                                newDust.fadeIn = dust.fadeIn;
+                                newDust.noGravity = dust.noGravity;
+                                newDust.scale = dust.scale;
+                                newDust.rotation = dust.rotation;
+                                newDust.noLight = dust.noLight;
+                                newDust.active = dust.active;
+                                newDust.type = dust.type;
+                                newDust.color = dust.color;
+                                newDust.alpha = dust.alpha;
+                                newDust.frame = dust.frame;
+                                newDust.shader = dust.shader;
+                                newDust.customData = dust.customData;
+                            }
+                        Main.maxDustToDraw = 0;
+                        foreach (var i in structure.dustIdentities)
+                            if (i != null && i.active)
+                            {
+                                tempDustBuffer[Main.maxDustToDraw] = i;
+                                Main.maxDustToDraw += 1;
+                            }
+                        if (Main.maxDustToDraw > 0)
+                        {
+                            Main.dust = tempDustBuffer;
+                            _activeEngineInfo.SetValue(null, structure.lightingEngine);
+                            banNewDust = true;
+                            Dust.UpdateDust();
+                            banNewDust = false;
+                            Main.dust = projectorDust;
+                        }
+                        structure.dustIdentities.RemoveAll((Dust i) => i == null || !i.active);
+                    }
             }
             catch
             {
@@ -1316,7 +1517,41 @@ namespace ImmersiveProjector
                     projectorDust[i].dustIndex = i;
                 }
             }
+            for (int i = origMaxDust; i < 6000; i++)
+                projectorDust[i].active = false;
+            overrideDustUpdate = false;
             Main.dust = origDust;
+            Main.maxDustToDraw = origMaxDust;
+            Main.screenPosition = origScreenPosition;
+            Main.screenWidth = origScreenWidth;
+            Main.screenHeight = origScreenHeight;
+            Main.offScreenRange = origOffscreenRange;
+            Dust.dCount = origDCount;
+            workingDustIdentityList = tempDustIdentityList;
+            tempDustIdentityList.Clear();
+            _activeEngineInfo.SetValue(null, origActiveEngine);
+        }
+
+        public override void PreUpdateGores()
+        {
+            var origGore = Main.gore;
+            Main.gore = projectorGore;
+            for (int i = 0; i < 600; i++)
+            {
+                try
+                {
+                    projectorGore[i].Update();
+                }
+                catch
+                {
+                    projectorGore[i] = new Gore();
+                }
+            }
+            Main.gore = origGore;
+        }
+
+        public override void PostUpdatePlayers()
+        {
         }
 
         public override void PostUpdateEverything()

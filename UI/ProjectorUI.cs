@@ -317,10 +317,11 @@ namespace ImmersiveProjector.UI
 
 		private void InitializeSelectionPage(UIElement page, int index)
 		{
-            Asset<Texture2D> assetGrid9 = ImmersiveProjector.Instance.Assets.Request<Texture2D>("Textures/Handle9Grid");
+            Asset<Texture2D> assetGridB = ImmersiveProjector.Instance.Assets.Request<Texture2D>("Textures/Handle9Grid");
+            Asset<Texture2D> assetGridY = ImmersiveProjector.Instance.Assets.Request<Texture2D>("Textures/Handle9Grid2");
 			Func<bool> activeFunc = () => (page.Parent != null);
-			sourceGrid = new HandleGridGroup(assetGrid9, Vector2.Zero, Vector2.Zero, Vector2.One * 200, activeFunc);
-			targetGrid = new HandleGridGroup(assetGrid9, Vector2.Zero, Vector2.Zero, Vector2.One * 200, activeFunc);
+			sourceGrid = new HandleGridGroup(assetGridB, Vector2.Zero, Vector2.Zero, Vector2.One * 200, activeFunc);
+			targetGrid = new HandleGridGroup(assetGridY, Vector2.Zero, Vector2.Zero, Vector2.One * 200, activeFunc);
 			sourceGrid.AddChildrenTo(this);
 			targetGrid.AddChildrenTo(this);
 			sourceGrid.transformType = HandleGridGroup.TransformType.FreeTransform;

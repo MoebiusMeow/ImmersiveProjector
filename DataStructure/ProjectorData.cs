@@ -151,10 +151,11 @@ namespace ImmersiveProjector.DataStructure
         public void SetDefaultPosition(Vector2 center)
         {
             anchor = Vector2.One * 0.5f;
+            center = 8 * new Vector2(MathF.Round(center.X / 8), MathF.Round(center.Y / 8));
             targetScale = 1f;
-            sourcePoint = center + new Vector2(-160, 80);
+            sourcePoint = center + new Vector2(-120, 80);
             sourceSize = Vector2.One * 160;
-            targetPoint = sourcePoint - new Vector2(-320, 160);
+            targetPoint = sourcePoint - new Vector2(-240, 160);
         }
 
         public void SetDefault(Vector2 center)

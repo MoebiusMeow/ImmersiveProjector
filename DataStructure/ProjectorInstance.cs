@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.GameContent.UI.Elements;
+using Terraria.Graphics.Light;
 using Terraria.ModLoader.UI.Elements;
 using Terraria.UI;
 using static Terraria.WaterfallManager;
@@ -23,6 +24,19 @@ namespace ImmersiveProjector.DataStructure
         public int waterfallCount = 0;
         public WaterfallData[] waterfalls = null;
 
+        public LightingEngine lightingEngine;
+
+        public List<Dust> dustIdentities;
+        public List<Gore> goreIdentities;
+
+        public Vector2 cacheTopLeft;
+        public Vector2 cacheBottomRight;
+        public Vector2 cacheTargetOffset;
+        public bool cacheHitFlag;
+        public bool cacheNeedDraw;
+        public Vector2 cacheSourceTopLeft;
+        public Vector2 cacheSourceBottomRight;
+
         public float fadingValue;
 
         public Vector2 targetSize => data.targetSize;
@@ -30,17 +44,14 @@ namespace ImmersiveProjector.DataStructure
         public Vector2 sourceBottomRight => data.sourceBottomRight;
         public Vector2 targetTopLeft => data.targetTopLeft;
         public Vector2 targetBottomRight => data.targetBottomRight;
-        /*
-        public Vector2 anchor { get => data.anchor; set => data.anchor = value }
-        public Vector2 sourcePoint { get => data.sourcePoint; set => data.sourcePoint = value; }
-        public Vector2 sourceSize { get => data.sourceSize; set => data.sourceSize = value; }
-        public Vector2 targetPoint { get => data.targetPoint; set => data.targetPoint = value; }
-        public float targetScale { get => data.targetScale; set => data.targetScale = value; }
-        */
 
         private ProjectorInstance(Point tilePosition)
         {
             data = new ProjectorData(Vector2.Zero, Vector2.One * 100, Vector2.Zero);
+            lightingEngine = new LightingEngine();
+            lightingEngine.Rebuild();
+            dustIdentities = new List<Dust>();
+            goreIdentities = new List<Gore>();
             this.tilePosition = tilePosition;
         }
 
