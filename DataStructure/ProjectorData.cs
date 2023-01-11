@@ -142,9 +142,9 @@ namespace ImmersiveProjector.DataStructure
 
         public float priority { get; set; }
 
-        public float colorR { get; set; }
-        public float colorG { get; set; }
-        public float colorB { get; set; }
+        public float colorH { get; set; }
+        public float colorS { get; set; }
+        public float colorV { get; set; }
         public float colorA { get; set; }
         public float parallax { get; set; }
 
@@ -190,7 +190,8 @@ namespace ImmersiveProjector.DataStructure
             SetDefaultPosition(center);
             captureSolid = 2;
             captureWall = 1;
-            colorA = colorR = colorG = colorB = 1;
+            colorA = 1;
+            colorH = colorS = colorV = 0;
             turnedOn = 1;
         }
 

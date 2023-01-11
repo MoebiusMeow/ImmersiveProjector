@@ -94,6 +94,7 @@ namespace ImmersiveProjector
         public static List<ProjectorInstance> ListInWorld { get => ModContent.GetInstance<ProjectorSystem>().projectorList; }
 
         public Effect projectorRangeDisplayEffect;
+        public Effect projectorFilterEffect;
 
         public Action<SpriteBatch> delayedSpriteDraw;
 
@@ -242,6 +243,7 @@ namespace ImmersiveProjector
         public override void OnModLoad()
         {
             projectorRangeDisplayEffect = Mod.Assets.Request<Effect>("Effects/ProjectorRangeDisplay", AssetRequestMode.ImmediateLoad).Value;
+            projectorFilterEffect = Mod.Assets.Request<Effect>("Effects/ProjectorFilter", AssetRequestMode.ImmediateLoad).Value;
             projectorLiquidRenderer = new LiquidRenderer();
             var info = typeof(LiquidRenderer).GetMethod("PrepareAssets", BindingFlags.Instance | BindingFlags.NonPublic);
             info.Invoke(projectorLiquidRenderer, new object[] { });
@@ -1092,7 +1094,7 @@ namespace ImmersiveProjector
 
             // Main.graphics.GraphicsDevice.SetRenderTarget(overlayRT);
             Main.graphics.GraphicsDevice.SetRenderTargets(origTargets);
-            Main.spriteBatch.Begin(SpriteSortMode.Texture, structure.data.blending == (int)ProjectorData.BlendingFlag.Additive ? BlendState.Additive : BlendState.AlphaBlend,
+            Main.spriteBatch.Begin(SpriteSortMode.Immediate, structure.data.blending == (int)ProjectorData.BlendingFlag.Additive ? BlendState.Additive : BlendState.AlphaBlend,
                 Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
 
             float rotation = structure.data.targetRotation / 180f * MathF.PI;
@@ -1111,9 +1113,24 @@ namespace ImmersiveProjector
                 effectOffset = Vector2.UnitX.RotatedBy(Main.timeForVisualEffects * 1) * structure.fadingValue;
             }
 
-            Color color = structure.data.blending == (int)ProjectorData.BlendingFlag.Additive ? 
+            /*Color color = structure.data.blending == (int)ProjectorData.BlendingFlag.Additive ? 
                 new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB, alpha):
                 new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB) * alpha;
+            */
+            Color color = structure.data.filter == (int)ProjectorData.FilterFlag.Holographic ? Color.Blue : Color.White;
+            if (structure.data.colorA != 1 || structure.data.colorH != 0 || structure.data.colorS != 0 || structure.data.colorV != 0 || color != Color.White)
+            {
+                Vector3 uHSV = new Vector3(
+                    structure.data.colorH / 180f + (structure.data.filter == (int)ProjectorData.FilterFlag.Holographic ? 270 / 360f: 0),
+                    structure.data.colorS / 100f,
+                    structure.data.colorV / 100f
+                );
+                projectorFilterEffect.Parameters["uHSV"].SetValue(uHSV);
+                projectorFilterEffect.Parameters["uRGB"].SetValue(color.ToVector3());
+                projectorFilterEffect.Parameters["uAlpha"].SetValue(structure.data.colorA);
+                projectorFilterEffect.Parameters["uPrem"].SetValue(structure.data.blending != (int)ProjectorData.BlendingFlag.Additive);
+                projectorFilterEffect.CurrentTechnique.Passes["HSV"].Apply();
+            }
 
             Vector2 ori = structure.data.targetPoint - targetTopLeft;
             var scale = structure.data.targetScale;

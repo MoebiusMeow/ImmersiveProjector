@@ -78,6 +78,9 @@ Mods: {
 			Red: Red
 			Green: Green
 			Blue: Blue
+			ColorH: Hue offset
+			ColorS: Saturation offset
+			ColorV: Value offset
 			Opacity: Opacity
 
 			CaptureBehavior: When players enter

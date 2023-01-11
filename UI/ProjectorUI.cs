@@ -481,21 +481,6 @@ namespace ImmersiveProjector.UI
 			page.Append(captureCreatureVPanel);
 
 
-			TogglePanel captureBlendVPanel = new TogglePanel(2, toggleItemTexture, new Rectangle(0, 32 * 2, 32, 32), panelBackground);
-			captureBlendVPanel.Width.Set(0, 1);
-			captureBlendVPanel.Top.Set(-(tabHeight[index] - 180), 1);
-			captureBlendVPanel.Height.Set(40, 0);
-			captureBlendVPanel.configName = ImmersiveProjector.ModTranslate("CaptureBlends", "Config.");
-			captureBlendVPanel.bindedValue = typeof(ProjectorData).GetProperty("blending");
-			togglePanels.Add(captureBlendVPanel);
-
-			captureBlendVPanel.tooltips = new string[]
-			{
-                ImmersiveProjector.ModTranslate("CaptureBlendsD", "Config."),
-                ImmersiveProjector.ModTranslate("CaptureBlendsA", "Config."),
-			};
-			page.Append(captureBlendVPanel);
-
 
 			TogglePanel captureLayerVPanel = new TogglePanel(4, toggleItemTexture, new Rectangle(0, 32 * 4, 32, 32), panelBackground);
 			captureLayerVPanel.Width.Set(0, 1);
@@ -607,37 +592,37 @@ namespace ImmersiveProjector.UI
 
 		private void InitializeColorPage(UIElement page, int index)
 		{
-			SliderPanel ColorRVPanel = new SliderPanel(0, 1, Color.Red, panelBackground, null);
-			ColorRVPanel.valueSnapping = 0.01f;
-			ColorRVPanel.tooltip = ColorRVPanel.configName = ImmersiveProjector.ModTranslate("Red", "Config.");
-			ColorRVPanel.bindedValue = typeof(ProjectorData).GetProperty("colorR");
+			SliderPanel ColorRVPanel = new SliderPanel(-180, 180, Color.Gray, panelBackground, null);
+			ColorRVPanel.valueSnapping = 5.0f;
+			ColorRVPanel.tooltip = ColorRVPanel.configName = ImmersiveProjector.ModTranslate("ColorH", "Config.");
+			ColorRVPanel.bindedValue = typeof(ProjectorData).GetProperty("colorH");
 			sliderPanels.Add(ColorRVPanel);
 			ColorRVPanel.Width.Set(0, 1);
 			ColorRVPanel.Top.Set(-(tabHeight[index] - 60), 1);
 			ColorRVPanel.Height.Set(40, 0);
 			page.Append(ColorRVPanel);
 
-			SliderPanel ColorGVPanel = new SliderPanel(0, 1, Color.Green, panelBackground, null);
-			ColorGVPanel.valueSnapping = 0.01f;
-			ColorGVPanel.tooltip = ColorGVPanel.configName = ImmersiveProjector.ModTranslate("Green", "Config.");
-			ColorGVPanel.bindedValue = typeof(ProjectorData).GetProperty("colorG");
+			SliderPanel ColorGVPanel = new SliderPanel(-100, 100, Color.Gray, panelBackground, null);
+			ColorGVPanel.valueSnapping = 2.0f;
+			ColorGVPanel.tooltip = ColorGVPanel.configName = ImmersiveProjector.ModTranslate("ColorS", "Config.");
+			ColorGVPanel.bindedValue = typeof(ProjectorData).GetProperty("colorS");
 			sliderPanels.Add(ColorGVPanel);
 			ColorGVPanel.Width.Set(0, 1);
 			ColorGVPanel.Top.Set(-(tabHeight[index] - 100), 1);
 			ColorGVPanel.Height.Set(40, 0);
 			page.Append(ColorGVPanel);
 
-			SliderPanel ColorBVPanel = new SliderPanel(0, 1, Color.Blue, panelBackground, null);
-			ColorBVPanel.valueSnapping = 0.01f;
-			ColorBVPanel.tooltip = ColorBVPanel.configName = ImmersiveProjector.ModTranslate("Blue", "Config.");
-			ColorBVPanel.bindedValue = typeof(ProjectorData).GetProperty("colorB");
+			SliderPanel ColorBVPanel = new SliderPanel(-100, 100, Color.Gray, panelBackground, null);
+			ColorBVPanel.valueSnapping = 2.0f;
+			ColorBVPanel.tooltip = ColorBVPanel.configName = ImmersiveProjector.ModTranslate("ColorV", "Config.");
+			ColorBVPanel.bindedValue = typeof(ProjectorData).GetProperty("colorV");
 			sliderPanels.Add(ColorBVPanel);
 			ColorBVPanel.Width.Set(0, 1);
 			ColorBVPanel.Top.Set(-(tabHeight[index] - 140), 1);
 			ColorBVPanel.Height.Set(40, 0);
 			page.Append(ColorBVPanel);
 
-			SliderPanel ColorAVPanel = new SliderPanel(0, 1, Main.OurFavoriteColor, panelBackground, null);
+			SliderPanel ColorAVPanel = new SliderPanel(0, 1, Color.Gray, panelBackground, null);
 			ColorAVPanel.valueSnapping = 0.01f;
 			ColorAVPanel.tooltip = ColorAVPanel.configName = ImmersiveProjector.ModTranslate("Opacity", "Config.");
 			ColorAVPanel.bindedValue = typeof(ProjectorData).GetProperty("colorA");
@@ -660,7 +645,23 @@ namespace ImmersiveProjector.UI
                 ImmersiveProjector.ModTranslate("CaptureFilterN", "Config."),
                 ImmersiveProjector.ModTranslate("CaptureFilterH", "Config."),
 			};
-			// page.Append(captureFilterVPanel);
+			page.Append(captureFilterVPanel);
+
+			TogglePanel captureBlendVPanel = new TogglePanel(2, toggleItemTexture, new Rectangle(0, 32 * 2, 32, 32), panelBackground);
+			captureBlendVPanel.Width.Set(0, 1);
+			captureBlendVPanel.Top.Set(-(tabHeight[index] - 260), 1);
+			captureBlendVPanel.Height.Set(40, 0);
+			captureBlendVPanel.configName = ImmersiveProjector.ModTranslate("CaptureBlends", "Config.");
+			captureBlendVPanel.bindedValue = typeof(ProjectorData).GetProperty("blending");
+			togglePanels.Add(captureBlendVPanel);
+
+			captureBlendVPanel.tooltips = new string[]
+			{
+                ImmersiveProjector.ModTranslate("CaptureBlendsD", "Config."),
+                ImmersiveProjector.ModTranslate("CaptureBlendsA", "Config."),
+			};
+			page.Append(captureBlendVPanel);
+
 		}
 
 		public void InitializeAll()
