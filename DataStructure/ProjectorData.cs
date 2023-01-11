@@ -74,60 +74,87 @@ namespace ImmersiveProjector.DataStructure
             None = 0,
             All = 1
         }
+        public enum MiscFollowOptionMask
+        {
+            None = 0,
+            FollowRotation = 1,
+            FollowSpeedRotation = 2,
+            FollowFlip = 4,
+            Full = 7
+        }
 
-        [JsonInclude]
-        public int turnedOn;
-        [JsonInclude]
-        public Vector2 anchor; // (0, 0) to (1, 1)
-        [JsonInclude]
-        public Vector2 sourcePoint;
-        [JsonInclude]
-        public Vector2 sourceSize;
-        [JsonInclude]
-        public Vector2 targetPoint;
-        [JsonInclude]
-        public float targetScale;
+        public int turnedOn { get; set; }
+        public Vector2 anchor { get; set; } // (0, 0) to (1, 1)
+        public Vector2 sourcePoint { get; set; }
+        public Vector2 sourceSize { get; set; }
+        public Vector2 targetPoint { get; set; }
+        public float targetScale { get; set; }
 
-        [JsonInclude]
-        public float targetRotation;
-        [JsonInclude]
-        public int targetFlip;
+        public float targetRotation { get; set; }
+        public int targetFlip { get; set; }
 
-        [JsonInclude]
-        public int captureSolid;
-        [JsonInclude]
-        public int captureWall;
-        [JsonInclude]
-        public int captureCreature;
+        public int captureSolid { get; set; }
+        public int captureWall { get; set; }
+        public int captureCreature { get; set; }
 
-        [JsonInclude]
-        public int blending;
-        [JsonInclude]
-        public int behavior;
-        [JsonInclude]
-        public int layer;
-        [JsonInclude]
-        public int sourceFollow;
-        [JsonInclude]
-        public float sourceFollowId;
-        [JsonInclude]
-        public int targetFollow;
-        [JsonInclude]
-        public float targetFollowId;
-        [JsonInclude]
-        public int filter;
+        public int blending { get; set; }
+        public int behavior { get; set; }
+        public int layer { get; set; }
+        public int sourceFollow { get; set; }
+        public float sourceFollowId { get; set; }
 
-        [JsonInclude]
-        public float priority;
+        private int _sourceFollowMisc;
+        public int sourceFollowRotation 
+        { 
+            get => ((_sourceFollowMisc & (int)MiscFollowOptionMask.FollowRotation) > 0).ToInt(); 
+            set => _sourceFollowMisc = (_sourceFollowMisc | (int)MiscFollowOptionMask.FollowRotation) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowRotation); 
+        }
+        public int sourceFollowSpeedRotation 
+        { 
+            get => ((_sourceFollowMisc & (int)MiscFollowOptionMask.FollowSpeedRotation) > 0).ToInt(); 
+            set => _sourceFollowMisc = (_sourceFollowMisc | (int)MiscFollowOptionMask.FollowSpeedRotation) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowSpeedRotation); 
+        }
+        public int sourceFollowFlip
+        { 
+            get => ((_sourceFollowMisc & (int)MiscFollowOptionMask.FollowFlip) > 0).ToInt(); 
+            set => _sourceFollowMisc = (_sourceFollowMisc | (int)MiscFollowOptionMask.FollowFlip) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowFlip); 
+        }
 
-        [JsonInclude]
-        public float colorR;
-        [JsonInclude]
-        public float colorG;
-        [JsonInclude]
-        public float colorB;
-        [JsonInclude]
-        public float colorA;
+        public int targetFollow { get; set; }
+        public float targetFollowId { get; set; }
+        private int _targetFollowMisc;
+        public int targetFollowRotation 
+        { 
+            get => ((_targetFollowMisc & (int)MiscFollowOptionMask.FollowRotation) > 0).ToInt(); 
+            set => _targetFollowMisc = (_targetFollowMisc | (int)MiscFollowOptionMask.FollowRotation) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowRotation); 
+        }
+        public int targetFollowSpeedRotation 
+        { 
+            get => ((_targetFollowMisc & (int)MiscFollowOptionMask.FollowSpeedRotation) > 0).ToInt(); 
+            set => _targetFollowMisc = (_targetFollowMisc | (int)MiscFollowOptionMask.FollowSpeedRotation) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowSpeedRotation); 
+        }
+        public int targetFollowFlip
+        { 
+            get => ((_targetFollowMisc & (int)MiscFollowOptionMask.FollowFlip) > 0).ToInt(); 
+            set => _targetFollowMisc = (_targetFollowMisc | (int)MiscFollowOptionMask.FollowFlip) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowFlip); 
+        }
+        public int filter { get; set; }
+
+        public float priority { get; set; }
+
+        public float colorR { get; set; }
+        public float colorG { get; set; }
+        public float colorB { get; set; }
+        public float colorA { get; set; }
+        public float parallax { get; set; }
+
+        private int testMaskFlag;
+
+        public int testGetSet
+        {
+            get => testMaskFlag & 1;
+            set => testMaskFlag = (testMaskFlag & ((-1 + (1 << 1)) ^ (1))) + value;
+        }
 
         public ProjectorData()
         {
@@ -170,17 +197,17 @@ namespace ImmersiveProjector.DataStructure
         public void CopyDataFrom(ProjectorData other)
         {
             Type type = typeof(ProjectorData);
-            foreach (var field in type.GetFields())
+            foreach (var property in type.GetProperties(BindingFlags.Public))
             {
-                field.SetValue(this, field.GetValue(other));
+                property.SetValue(this, property.GetValue(other));
             }
         }
 
         public bool DataEqualsTo(ProjectorData other)
         {
             Type type = typeof(ProjectorData);
-            foreach (var field in type.GetFields())
-                if (!field.GetValue(this).Equals(field.GetValue(other)))
+            foreach (var property in type.GetProperties(BindingFlags.Public))
+                if (!property.GetValue(this).Equals(property.GetValue(other)))
                     return false;
             return true;
         }

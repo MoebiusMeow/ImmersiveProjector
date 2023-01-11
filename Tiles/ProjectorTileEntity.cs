@@ -47,11 +47,7 @@ namespace ImmersiveProjector.Tiles
 
         public string GetSerializedData()
         {
-            var options = new JsonSerializerOptions();
-            options.IncludeFields = true;
-            options.IgnoreReadOnlyFields = true;
-            options.IgnoreReadOnlyProperties = true;
-            return data != null ? JsonSerializer.Serialize(data, typeof(ProjectorData), options) : "ennia";
+            return data != null ? data.ToJson() : "ennia";
         }
 
         public bool BuildFromSerializedData(string doc)

@@ -27,7 +27,7 @@ namespace ImmersiveProjector.DataStructure
         public LightingEngine lightingEngine;
 
         public List<Dust> dustIdentities;
-        public List<Gore> goreIdentities;
+        // public List<Gore> goreIdentities;
 
         public Vector2 cacheTopLeft;
         public Vector2 cacheBottomRight;
@@ -51,7 +51,7 @@ namespace ImmersiveProjector.DataStructure
             lightingEngine = new LightingEngine();
             lightingEngine.Rebuild();
             dustIdentities = new List<Dust>();
-            goreIdentities = new List<Gore>();
+            // goreIdentities = new List<Gore>();
             this.tilePosition = tilePosition;
         }
 

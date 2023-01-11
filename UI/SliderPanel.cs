@@ -30,7 +30,7 @@ namespace ImmersiveProjector.UI
 
 		public Action<float> onValueChanged;
 
-		public FieldInfo bindedValue;
+		public PropertyInfo bindedValue;
 		public ProjectorData bindedObject;
 
 		public SliderPanel(float valueMin, float valueMax, Color color, Asset<Texture2D> background, Asset<Texture2D> border = null) : base(background, border)

@@ -27,7 +27,7 @@ namespace ImmersiveProjector.UI
 		public Action<int> onValueChanged;
 		public string[] tooltips = null;
 
-		public FieldInfo bindedValue;
+		public PropertyInfo bindedValue;
 		public ProjectorData bindedObject;
 
 		public TogglePanel(int valueRange, Asset<Texture2D> item, Rectangle startFrame, Asset<Texture2D> background, Asset<Texture2D> border = null) : base(background, border)

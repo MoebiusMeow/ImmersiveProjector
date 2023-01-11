@@ -32,6 +32,7 @@ using Terraria.IO;
 using System.Threading;
 using MonoMod.Cil;
 using Mono.Cecil.Cil;
+using Terraria.ID;
 
 namespace ImmersiveProjector
 {
@@ -55,7 +56,7 @@ namespace ImmersiveProjector
         public Dust[] projectorDust;
         public Gore[] projectorGore;
         // Temporary buffer to for UpdateDust
-        public Dust[] tempDustBuffer;
+        public Dust[] tempDustBuffer = null;
 
         // Lighting
         // Create new lighting engines
@@ -76,10 +77,13 @@ namespace ImmersiveProjector
         // ban NewDust from being called
         private bool banNewDust = false;
         // also change DustUpdate to return as soon as Main.maxDustToDraw is reached
+        // IL warning: overrideDustUpdate uses IL editing
         private bool overrideDustUpdate = false;
         private List<Dust> workingDustIdentityList = null;
+        private List<Gore> workingGoreIdentityList = null;
         // temp list to store newly created per-frame dusts
         public List<Dust> tempDustIdentityList = null;
+        public List<Gore> tempGoreIdentityList = null;
 
         // Only for UI color
         private bool findingTargetFlag = false;
@@ -182,6 +186,7 @@ namespace ImmersiveProjector
             tempDustBuffer = new Dust[6002];
             projectorGore = new Gore[602];
             tempDustIdentityList = new List<Dust>();
+            tempGoreIdentityList = new List<Gore>();
             for (int i = 0; i <= 6000; i++)
             {
                 projectorDust[i] = new Dust();
@@ -226,6 +231,7 @@ namespace ImmersiveProjector
             On.Terraria.Main.DrawCachedNPCs += DrawCachedNPCsDecorator;
             On.Terraria.Lighting.Initialize += LightingInitializeDecorator;
             On.Terraria.Dust.NewDust += NewDustDecorator;
+            On.Terraria.Gore.NewGore_IEntitySource_Vector2_Vector2_int_float += NewGoreDecorator;
             On.Terraria.Graphics.Light.LightingEngine.AddLight += AddLightDecorator;
             IL.Terraria.Dust.UpdateDust += UpdateDustILEdit;
             legacyLightingRebuilt = false;
@@ -253,6 +259,7 @@ namespace ImmersiveProjector
             On.Terraria.Main.DrawCachedNPCs -= DrawCachedNPCsDecorator;
             On.Terraria.Lighting.Initialize -= LightingInitializeDecorator;
             On.Terraria.Dust.NewDust -= NewDustDecorator;
+            On.Terraria.Gore.NewGore_IEntitySource_Vector2_Vector2_int_float -= NewGoreDecorator;
             On.Terraria.Graphics.Light.LightingEngine.AddLight -= AddLightDecorator;
             IL.Terraria.Dust.UpdateDust -= UpdateDustILEdit;
             base.Unload();
@@ -614,6 +621,7 @@ namespace ImmersiveProjector
             Main.dust = projectorDust;
             Main.gore = projectorGore;
             workingDustIdentityList = structure.dustIdentities;
+            workingGoreIdentityList = null;
 
             // Try fixing White / Retro Lighting Mode
             // Be careful! The setter method of Light.Mode
@@ -708,7 +716,7 @@ namespace ImmersiveProjector
             else
                 EnsureProjectorRT(targetSize.X, targetSize.Y);
 
-            Main.drawToScreen = false;
+            Main.drawToScreen = true;
             Main.offScreenRange = 0;
             // Main.screenPosition = Main.LocalPlayer.Center + new Vector2(Main.mouseX - Main.screenWidth * 0.5f, Main.mouseY - Main.screenHeight * 0.5f) - new Vector2(16, 100);
             Main.screenWidth = (int)Math.Ceiling(sourceSize.X) + 1;
@@ -986,10 +994,10 @@ namespace ImmersiveProjector
                 // FastInvoke(Main.instance, "DrawGore", new object[] { });
 
                 // There is some problem causing DrawGore to fail (Perhaps IL stuffs)
-                Main.gore = origGore;
+                // Main.gore = origGore;
                 info = typeof(Main).GetMethod("DrawGore", BindingFlags.Instance | BindingFlags.NonPublic);
                 Main.spriteBatch.Begin();
-                info.Invoke(Main.instance, new object[] {  });
+                // info.Invoke(Main.instance, new object[] {  });
                 Main.gore = projectorGore;
                 info.Invoke(Main.instance, new object[] {  });
                 Main.spriteBatch.End();
@@ -1078,6 +1086,7 @@ namespace ImmersiveProjector
             Main.dust = origDust;
             Main.gore = origGore;
             workingDustIdentityList = tempDustIdentityList;
+            workingGoreIdentityList = tempGoreIdentityList;
 
             projectorProcessing = false;
 
@@ -1235,6 +1244,15 @@ namespace ImmersiveProjector
         {
             // Main.NewText("{0}, {1}, {2}".FormatWith(x, y, color));
             orig(self, x, y, color);
+        }
+
+        public int NewGoreDecorator(On.Terraria.Gore.orig_NewGore_IEntitySource_Vector2_Vector2_int_float orig, 
+                                    IEntitySource source, Vector2 position, Vector2 velocity, int type, float scale)
+        {
+            int id = orig(source, position, velocity, type, scale);
+            if (workingGoreIdentityList != null && id < Main.maxGore && !(source is EntitySource_TileUpdate) && type != GoreID.FogMachineCloud1)
+                workingGoreIdentityList.Add(Main.gore[id]);
+            return id;
         }
 
         public int NewDustDecorator(On.Terraria.Dust.orig_NewDust orig, Vector2 position, int width, int height, int type,
@@ -1443,6 +1461,7 @@ namespace ImmersiveProjector
 
         public override void PreUpdateDusts()
         {
+            // Update dusts in each projector area
             var origDust = Main.dust;
             var origDCount = Dust.dCount;
             var origMaxDust = Main.maxDustToDraw;
@@ -1467,10 +1486,13 @@ namespace ImmersiveProjector
                         Main.screenPosition = topLeft;
                         Main.screenWidth = (int)size.X + 1;
                         Main.screenHeight = (int)size.Y + 1;
+                        // There is a hook that save reference of new dusts in workingDustIdentityList
                         workingDustIdentityList = structure.dustIdentities;
                         foreach (var dust in tempDustIdentityList)
                             if (dust != null && dust.active)
                             {
+                                // Copy newly created dusts from real Main.dust
+                                // to dust list of this projector
                                 int id = Dust.NewDust(dust.position, 0, 0, dust.type);
                                 if (id >= Main.maxDust)
                                     continue;
@@ -1536,6 +1558,26 @@ namespace ImmersiveProjector
         {
             var origGore = Main.gore;
             Main.gore = projectorGore;
+            workingGoreIdentityList = null;
+            foreach (var gore in tempGoreIdentityList)
+                if (gore != null && gore.active)
+                {
+                    int id = Gore.NewGore(new EntitySource_Misc("Immersive Projector"), gore.position, gore.velocity, gore.type);
+                    if (id >= Main.maxGore)
+                        continue;
+                    Gore newDust = Main.gore[id];
+                    newDust.position = gore.position;
+                    newDust.velocity = gore.velocity;
+                    newDust.scale = gore.scale;
+                    newDust.rotation = gore.rotation;
+                    newDust.active = gore.active;
+                    newDust.type = gore.type;
+                    newDust.alpha = gore.alpha;
+                    newDust.frame = gore.frame;
+                    newDust.frameCounter = gore.frameCounter;
+                    newDust.behindTiles = gore.behindTiles;
+                    newDust.light = gore.light;
+                }
             for (int i = 0; i < 600; i++)
             {
                 try
@@ -1547,6 +1589,8 @@ namespace ImmersiveProjector
                     projectorGore[i] = new Gore();
                 }
             }
+            tempGoreIdentityList.Clear();
+            workingGoreIdentityList = tempGoreIdentityList;
             Main.gore = origGore;
         }
 
