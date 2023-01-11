@@ -147,6 +147,7 @@ namespace ImmersiveProjector.DataStructure
         public float colorV { get; set; }
         public float colorA { get; set; }
         public float parallax { get; set; }
+        public float updateFreq { get; set; }
 
         private int testMaskFlag;
 
@@ -158,6 +159,7 @@ namespace ImmersiveProjector.DataStructure
 
         public ProjectorData()
         {
+            updateFreq = 0.5f;
         }
 
         public ProjectorData(Vector2 sourcePoint, Vector2 sourceSize, Vector2 targetPoint, Vector2? anchor = null, float targetScale = 1f)
@@ -180,8 +182,8 @@ namespace ImmersiveProjector.DataStructure
             anchor = Vector2.One * 0.5f;
             center = 8 * new Vector2(MathF.Round(center.X / 8), MathF.Round(center.Y / 8));
             targetScale = 1f;
-            sourcePoint = center + new Vector2(-120, 80);
-            sourceSize = Vector2.One * 160;
+            sourcePoint = center + new Vector2(-120, -80);
+            sourceSize = Vector2.One * 320;
             targetPoint = sourcePoint - new Vector2(-240, 160);
         }
 
@@ -193,13 +195,16 @@ namespace ImmersiveProjector.DataStructure
             colorA = 1;
             colorH = colorS = colorV = 0;
             turnedOn = 1;
+            updateFreq = 0.5f;
         }
 
         public void CopyDataFrom(ProjectorData other)
         {
             Type type = typeof(ProjectorData);
-            foreach (var property in type.GetProperties(BindingFlags.Public))
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
+                if (property.GetSetMethod() == null)
+                    continue;
                 property.SetValue(this, property.GetValue(other));
             }
         }
@@ -207,9 +212,13 @@ namespace ImmersiveProjector.DataStructure
         public bool DataEqualsTo(ProjectorData other)
         {
             Type type = typeof(ProjectorData);
-            foreach (var property in type.GetProperties(BindingFlags.Public))
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.GetSetMethod() == null)
+                    continue;
                 if (!property.GetValue(this).Equals(property.GetValue(other)))
                     return false;
+            }
             return true;
         }
 

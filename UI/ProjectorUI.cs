@@ -511,6 +511,16 @@ namespace ImmersiveProjector.UI
 			PriorityVPanel.Height.Set(40, 0);
 			page.Append(PriorityVPanel);
 
+			SliderPanel FreqencyVPanel = new SliderPanel(0.05f, 1, Color.OrangeRed, panelBackground, null);
+			FreqencyVPanel.valueSnapping = 0.01f;
+			FreqencyVPanel.configName = ImmersiveProjector.ModTranslate("CaptureFreqency", "Config.");
+			FreqencyVPanel.tooltip = ImmersiveProjector.ModTranslate("CaptureFreqencyToolTip", "Config.");
+			FreqencyVPanel.bindedValue = typeof(ProjectorData).GetProperty("updateFreq");
+			sliderPanels.Add(FreqencyVPanel);
+			FreqencyVPanel.Width.Set(0, 1);
+			FreqencyVPanel.Top.Set(-(tabHeight[index] - 300), 1);
+			FreqencyVPanel.Height.Set(40, 0);
+			page.Append(FreqencyVPanel);
 		}
 
 		private void InitializeBehaviorPage(UIElement page, int index)
@@ -588,6 +598,16 @@ namespace ImmersiveProjector.UI
 			page.Append(TargetIdVPanel);
 			page.Append(captureFollowTVPanel);
 
+			SliderPanel ParallaxVPanel = new SliderPanel(-1, 1, Color.OrangeRed, panelBackground, null);
+			ParallaxVPanel.valueSnapping = 0.05f;
+			ParallaxVPanel.configName = ImmersiveProjector.ModTranslate("CaptureParallax", "Config.");
+			ParallaxVPanel.tooltip = ImmersiveProjector.ModTranslate("CaptureParallaxToolTip", "Config.");
+			ParallaxVPanel.bindedValue = typeof(ProjectorData).GetProperty("parallax");
+			sliderPanels.Add(ParallaxVPanel);
+			ParallaxVPanel.Width.Set(0, 1);
+			ParallaxVPanel.Top.Set(-(tabHeight[index] - 250), 1);
+			ParallaxVPanel.Height.Set(40, 0);
+			page.Append(ParallaxVPanel);
 		}
 
 		private void InitializeColorPage(UIElement page, int index)

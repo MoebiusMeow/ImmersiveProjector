@@ -318,9 +318,16 @@ namespace ImmersiveProjector
         public void QuickDrawLineLocal(Vector2 from, Vector2 to, Color color)
         {
             SpriteBatch spriteBatch = Main.spriteBatch;
-            Rectangle simpleRect = new Rectangle(0, 0, 1, 1);
-            spriteBatch.Draw(TextureAssets.MagicPixel.Value, from, simpleRect, color, MathF.Atan2(to.Y - from.Y, to.X - from.X),
-                Vector2.UnitY * 0.5f, new Vector2((to - from).Length(), 2f), SpriteEffects.None, 0f);
+            Rectangle simpleRect = new Rectangle(
+                0 + (int)(512 * (Main.timeForVisualEffects * 0.01 - Math.Floor(Main.timeForVisualEffects * 0.01))) % 512,
+                0,
+                (int)((to - from).Length() * 2),
+                2
+            );
+            spriteBatch.Draw(TextureAssets.MagicPixel.Value, to, simpleRect, color * 0.5f, MathF.Atan2(-to.Y + from.Y, -to.X + from.X),
+                Vector2.UnitY * 0.5f, new Vector2(1 / 2f, 1f), SpriteEffects.None, 0f);
+            spriteBatch.Draw(TextureAssets.Extra[178].Value, to, simpleRect, color * 0.5f, MathF.Atan2(-to.Y + from.Y, -to.X + from.X),
+                Vector2.UnitY * 0.5f, new Vector2(1 / 2f, 3f), SpriteEffects.None, 0f);
         }
 
         public void QuickDrawLine(Vector2 from, Vector2 to, Color color)
@@ -374,9 +381,11 @@ namespace ImmersiveProjector
 
         public bool CalculateClippedArea(ProjectorInstance structure, out bool hitFlag, out Vector2 targetTopLeft, out Vector2 targetBottomRight, out Vector2 targetFollowOffset)
         {
+            var anchorOffset = structure.data.targetPoint - structure.tilePosition.ToWorldCoordinates();
             var targetSize = structure.data.targetSize;
             targetFollowOffset = Vector2.Zero;
 
+            structure.cacheTargetOffset = Vector2.Zero;
             switch (structure.data.targetFollow)
             {
                 case (int)ProjectorData.FollowingFlag.Player:
@@ -386,6 +395,7 @@ namespace ImmersiveProjector
                         if (player.active)
                         {
                             targetFollowOffset = -structure.data.targetPoint + player.Center;
+                            targetFollowOffset += anchorOffset;
                             break;
                         }
                     }
@@ -397,6 +407,7 @@ namespace ImmersiveProjector
                         if (npc.active && npc.boss)
                         {
                             targetFollowOffset = -structure.data.targetPoint + npc.Center;
+                            targetFollowOffset += anchorOffset;
                             break;
                         }
                     }
@@ -408,6 +419,7 @@ namespace ImmersiveProjector
                         if (npc.active && npc.townNPC)
                         {
                             targetFollowOffset = -structure.data.targetPoint + npc.Center;
+                            targetFollowOffset += anchorOffset;
                             break;
                         }
                     }
@@ -522,6 +534,7 @@ namespace ImmersiveProjector
 
         public void CalculateSourceAreaFromCache(ProjectorInstance structure, out Vector2 sourceTopLeft, out Vector2 sourceBottomRight, out Vector2 sourceFollowOffset)
         {
+            var anchorOffset = structure.data.sourcePoint - structure.tilePosition.ToWorldCoordinates();
             var targetTopLeft = structure.cacheTopLeft;
             var targetBottomRight = structure.cacheBottomRight;
             sourceTopLeft = (targetTopLeft - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
@@ -537,6 +550,7 @@ namespace ImmersiveProjector
                         if (player.active)
                         {
                             sourceFollowOffset = -structure.data.sourcePoint + player.Center;
+                            sourceFollowOffset += anchorOffset;
                             break;
                         }
                     }
@@ -548,6 +562,7 @@ namespace ImmersiveProjector
                         if (npc.active && npc.boss)
                         {
                             sourceFollowOffset = -structure.data.sourcePoint + npc.Center;
+                            sourceFollowOffset += anchorOffset;
                             break;
                         }
                     }
@@ -559,11 +574,13 @@ namespace ImmersiveProjector
                         if (npc.active && npc.townNPC)
                         {
                             sourceFollowOffset = -structure.data.sourcePoint + npc.Center;
+                            sourceFollowOffset += anchorOffset;
                             break;
                         }
                     }
                     break;
             }
+            structure.cacheSourceOffset = sourceFollowOffset;
             sourceTopLeft += sourceFollowOffset;
             sourceBottomRight += sourceFollowOffset;
             structure.cacheSourceTopLeft = sourceTopLeft;
@@ -616,6 +633,7 @@ namespace ImmersiveProjector
             var origScreenWidth = Main.screenWidth;
             var origScreenHeight = Main.screenHeight;
             var origOffscreenRange = Main.offScreenRange;
+            var origSampleState = Main.DefaultSamplerState.Filter;
 
             var origDust = Main.dust;
             var origGore = Main.gore;
@@ -695,20 +713,25 @@ namespace ImmersiveProjector
             }
             else
             {
-                WritePerframeLightsTo(projectorLightingEngine);
-                var stateInfo = typeof(LightingEngine).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
-                // SavePerframeLightsFrom(projectorLightingEngine);
-                // The first 2 states are
-                // EngineState.MinimapUpdate and EngineState.ExportMetrics
-                // we only use lighting engine to obtain lighting data
-                // stateInfo.SetValue(projectorLightingEngine, 2);
-                if ((int)stateInfo.GetValue(projectorLightingEngine) >= 2)
+                structure.updateCounter += MathF.Pow(structure.data.updateFreq, 2);
+                if (structure.updateCounter >= 1)
                 {
-                    // Finish the last 2 states (Scan and Blur)
-                    currentEngine.ProcessArea(lightingArea);
+                    WritePerframeLightsTo(projectorLightingEngine);
+                    structure.updateCounter -= 1;
+                    var stateInfo = typeof(LightingEngine).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
+                    // SavePerframeLightsFrom(projectorLightingEngine);
+                    // The first 2 states are
+                    // EngineState.MinimapUpdate and EngineState.ExportMetrics
+                    // we only use lighting engine to obtain lighting data
+                    // stateInfo.SetValue(projectorLightingEngine, 2);
+                    if ((int)stateInfo.GetValue(projectorLightingEngine) >= 2)
+                    {
+                        // Finish the last 2 states (Scan and Blur)
+                        currentEngine.ProcessArea(lightingArea);
+                    }
+                    else
+                        stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
                 }
-                else
-                    stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
             }
 
 
@@ -753,6 +776,8 @@ namespace ImmersiveProjector
                 Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value, renderRect, new Color(0, 0, 0, 0.0f));
                 Main.spriteBatch.End();
             }
+
+            Main.DefaultSamplerState.Filter = TextureFilter.Point;
 
 
             // Save states of special tiles
@@ -1072,6 +1097,7 @@ namespace ImmersiveProjector
             Main.screenWidth = origScreenWidth;
             Main.screenHeight = origScreenHeight;
             Main.offScreenRange = origOffscreenRange;
+            Main.DefaultSamplerState.Filter = origSampleState;
 
             Lighting.Mode = origLightingMode;
             Main.renderCount = origRenderCount;
@@ -1162,11 +1188,6 @@ namespace ImmersiveProjector
             Main.spriteBatch.End();
             if (targetFollowOffset.Length() > 0 || sourceFollowOffset.Length() > 0)
             {
-                findingTargetFlag = true;
-                structure.data.sourcePoint += sourceFollowOffset;
-                DrawStructureFrame();
-                findingTargetFlag = false;
-                structure.data.sourcePoint -= sourceFollowOffset;
                 structure.data.targetPoint -= targetFollowOffset;
             }
         }
@@ -1193,19 +1214,55 @@ namespace ImmersiveProjector
             if (UISystem.Instance.userInterface.CurrentState != null && !CaptureManager.Instance.IsCapturing)
             {
                 Main.spriteBatch.Begin(SpriteSortMode.Texture, BlendState.AlphaBlend,
-                    Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
-                var color = structure.TurnedOn() ? (findingTargetFlag ? Color.LightGreen * 0.5f : new Color(1, 0.95f, 0.3f) * 0.8f) : Color.Red * 0.5f;
-                QuickDrawBox(structure.sourceTopLeft, structure.data.sourceSize, color);
-                QuickDrawBox(structure.targetTopLeft, structure.data.targetSize, color);
-                QuickDrawBox(targetBoundTopLeft, targetBoundingR * 2, color);
-                Vector2 s0 = structure.data.sourceTopLeft;
-                Vector2 s1 = structure.data.sourceBottomRight;
-                Vector2 t0 = structure.data.targetTopLeft;
-                Vector2 t1 = structure.data.targetBottomRight;
-                QuickDrawLine(s0, t0, color);
-                QuickDrawLine(s1, t1, color);
-                QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
-                QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
+                    SamplerState.PointWrap, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
+                var color = structure.TurnedOn() ? (findingTargetFlag ? Color.LightGreen * 0.8f : new Color(1, 0.95f, 0.3f) * 0.8f) : Color.Red * 0.5f;
+                Vector2 s0, s1, t0, t1;
+                if ((structure.data.sourceFollow != 0 || structure.data.targetFollow != 0))
+                {
+                    Vector2 followOffset = structure.data.sourceFollow != 0 && findingTargetFlag ?
+                                           structure.cacheSourceOffset : Vector2.Zero;
+                    s1 = s0 = structure.data.sourcePoint;
+                    t0 = structure.tilePosition.ToWorldCoordinates(8, 8);
+                    t1 = structure.tilePosition.ToWorldCoordinates(8, 8);
+                    s0 += followOffset;
+                    s1 += followOffset;
+                    t0 += followOffset;
+                    t1 += followOffset;
+                    QuickDrawBox(structure.sourceTopLeft + followOffset, structure.data.sourceSize, color);
+                    QuickDrawLine(s0, t0, color);
+                    QuickDrawLine(s1, t1, color);
+                    QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
+                    QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
+                    followOffset = structure.data.targetFollow != 0 && findingTargetFlag ?
+                                   structure.cacheTargetOffset : Vector2.Zero;
+                    s0 = structure.tilePosition.ToWorldCoordinates(8, 8);
+                    s1 = structure.tilePosition.ToWorldCoordinates(8, 8);
+                    t1 = t0 = structure.data.targetPoint;
+                    s0 += followOffset;
+                    s1 += followOffset;
+                    t0 += followOffset;
+                    t1 += followOffset;
+                    QuickDrawLine(s0, t0, color);
+                    QuickDrawLine(s1, t1, color);
+                    QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
+                    QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
+                    QuickDrawBox(structure.targetTopLeft + followOffset, structure.data.targetSize, color);
+                    QuickDrawBox(targetBoundTopLeft + followOffset, targetBoundingR * 2, color);
+                }
+                else
+                {
+                    s0 = structure.data.sourceTopLeft;
+                    s1 = structure.data.sourceBottomRight;
+                    t0 = structure.data.targetTopLeft;
+                    t1 = structure.data.targetBottomRight;
+                    QuickDrawLine(s0, t0, color);
+                    QuickDrawLine(s1, t1, color);
+                    QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
+                    QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
+                    QuickDrawBox(structure.sourceTopLeft, structure.data.sourceSize, color);
+                    QuickDrawBox(structure.targetTopLeft, structure.data.targetSize, color);
+                    QuickDrawBox(targetBoundTopLeft, targetBoundingR * 2, color);
+                }
                 Main.spriteBatch.End();
 
                 color = Color.White * 0.5f;
@@ -1402,6 +1459,14 @@ namespace ImmersiveProjector
                 if (cachedList == Main.instance.DrawCacheNPCsOverPlayers)
                 {
                     Main.spriteBatch.End();
+                    if (uiSystem.projectorUIState.focusedInstance != null &&
+                        (uiSystem.projectorUIState.focusedInstance.data.sourceFollow != 0 ||
+                         uiSystem.projectorUIState.focusedInstance.data.targetFollow != 0))
+                    {
+                        findingTargetFlag = true;
+                        DrawStructureFrame();
+                        findingTargetFlag = false;
+                    }
                     DrawStructureFrame();
                     Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
                 }

@@ -34,8 +34,11 @@ namespace ImmersiveProjector.DataStructure
         public Vector2 cacheTargetOffset;
         public bool cacheHitFlag;
         public bool cacheNeedDraw;
+        public Vector2 cacheSourceOffset;
         public Vector2 cacheSourceTopLeft;
         public Vector2 cacheSourceBottomRight;
+
+        public float updateCounter;
 
         public float fadingValue;
 
