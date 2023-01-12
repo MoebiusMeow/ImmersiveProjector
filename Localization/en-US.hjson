@@ -72,11 +72,19 @@ Mods: {
 			CaptureLayersBF: Behind furnitures
 			CaptureLayersBW: Behind walls 
 
+			CaptureLightingSources: Lighting Source
+			CaptureLightingSourcesS: Source area
+			CaptureLightingSourcesT: Target area (faster) 
+			CaptureLightingSourcesB: Both areas 
+
 			CapturePriority: Layer Priority 
 			CapturePriorityToolTip: Layer Priority among stacked projections
 
-			CaptureFreqency: Lighting Freqency 
-			CaptureFreqencyToolTip: Reduce lighting freqency for higher performance
+			CaptureLightFreqency: Lighting Freqency 
+			CaptureLightFreqencyToolTip: Reduce lighting freqency for higher performance
+
+			CaptureFreqency: Refresh Freqency 
+			CaptureFreqencyToolTip: Reduce refresh freqency for higher performance (GPU RAM required)
 
 			CaptureParallax: Parallax 
 			CaptureParallaxToolTip: The length of the pink line

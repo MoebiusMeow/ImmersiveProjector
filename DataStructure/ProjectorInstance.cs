@@ -29,6 +29,10 @@ namespace ImmersiveProjector.DataStructure
         public List<Dust> dustIdentities;
         // public List<Gore> goreIdentities;
 
+        public Texture2D cachedImage = null;
+        public Vector2 cachedImageTopLeft;
+        public Vector2 cachedImageBottomRight;
+
         public Vector2 cacheTopLeft;
         public Vector2 cacheBottomRight;
         public Vector2 cacheTargetOffset;

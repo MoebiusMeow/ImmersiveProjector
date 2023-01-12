@@ -64,6 +64,10 @@ namespace ImmersiveProjector
         public LegacyLighting projectorLegacyLighting = new LegacyLighting(Main.Camera);
         private bool legacyLightingRebuilt;
         public IList perFrameLightList = null;
+        // Lighting source combination
+        public ILightingEngine origLightingEngineCache = null;
+        public ProjectorData.LightingSourceFlag lightingCombination = ProjectorData.LightingSourceFlag.Source;
+        public Dictionary<ValueTuple<int, int>, Vector3> referenceLightingCache = new Dictionary<(int, int), Vector3>();
 
         // Liquid Renderer
         public LiquidRenderer projectorLiquidRenderer;
@@ -99,79 +103,7 @@ namespace ImmersiveProjector
         public Action<SpriteBatch> delayedSpriteDraw;
 
 
-        // For faster reflection
-        // WIP
-        private Dictionary<string, FieldInfo> _fieldCache = new();
-        private Dictionary<string, Func<object, object>> _fieldGetterCache = new();
-        private Dictionary<string, Action<object, object>> _fieldSetterCache = new();
-
-        private Dictionary<string, MethodInfo> _methodInfoCache = new();
-        private Dictionary<string, Action<object>> _methodInvokerCache = new();
-
-
-        private void PrepareFastInstancedFieldReflection<T>(T instance, string field, BindingFlags bindingFlags)
-        {
-            string key = string.Concat(instance.GetType().Name, ".", field);
-            FieldInfo fieldInfo = instance.GetType().GetField(field, bindingFlags);
-            _fieldCache[key] = fieldInfo;
-            ParameterExpression param0 = Expression.Parameter(typeof(object), "instance");
-            ParameterExpression param1 = Expression.Parameter(typeof(object), "value");
-
-            UnaryExpression instanceCast = !fieldInfo.DeclaringType.IsValueType ?
-                                               Expression.TypeAs(param0, fieldInfo.DeclaringType):
-                                               Expression.Convert(param0, fieldInfo.DeclaringType);
-
-            // These two doesn't really improve performance
-            // currently placeholders
-            Func<object, object> getValueDelegate = Expression.Lambda<Func<object, object>>(
-                Expression.TypeAs(
-                    Expression.Call(instanceCast, typeof(FieldInfo).GetMethod("GetValue", BindingFlags.Instance | BindingFlags.Public)),
-                typeof(object)), param0).Compile();
-
-            Action<object, object> setValueDelegate = Expression.Lambda<Action<object, object>>(
-                Expression.Call(typeof(FieldInfo).GetMethod("SetValue", BindingFlags.Instance | BindingFlags.Public), param0, param1),
-                param0, param1).Compile();
-
-            _fieldGetterCache[key] = getValueDelegate;
-            _fieldSetterCache[key] = setValueDelegate;
-        }
-
-        private void PrepareFastInstancedMethodReflection<T>(T instance, string method, BindingFlags bindingFlags)
-        {
-            string key = string.Concat(instance.GetType().Name, ".", method);
-            MethodInfo methodInfo = instance.GetType().GetMethod(method, bindingFlags);
-            _methodInfoCache[key] = methodInfo;
-            ParameterExpression param0 = Expression.Parameter(instance.GetType(), "instance");
-            // ParameterExpression param1 = Expression.Parameter(typeof(object[]), "params");
-
-            // MethodCallExpression call = Expression.Call(param0, methodInfo);
-            // Action<object> invokeDelegate = (Action<object>)Expression.Lambda(call, param0).Compile();
-            Action<object> invokeDelegate = (Action<object>)Delegate.CreateDelegate(typeof(Action<Main>), methodInfo);
-            _methodInvokerCache[key] = invokeDelegate;
-        }
-
-        public object FastFieldGet<T>(T instance, string field, BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic)
-        {
-            string key = string.Concat(instance.GetType().Name, ".", field);
-            if (!_fieldCache.ContainsKey(key))
-                PrepareFastInstancedFieldReflection(instance, field, bindingFlags);
-            return _fieldGetterCache[key](instance);
-        }
-
-        public void FastFieldSet<T>(T instance, string field, object value, BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic)
-        {
-            string key = string.Concat(instance.GetType().Name, ".", field);
-            if (!_fieldCache.ContainsKey(key))
-                PrepareFastInstancedFieldReflection(instance, field, bindingFlags);
-            _fieldSetterCache[key](instance, value);
-        }
-        public void FastInvoke<T>(T instance, string method, object[] param, BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic)
-        {
-            string key = string.Concat(instance.GetType().Name, ".", method);
-            if (!_methodInfoCache.ContainsKey(key))
-                PrepareFastInstancedMethodReflection(instance, method, bindingFlags);
-            _methodInvokerCache[key](instance);
-        }
+        private SpriteBatchHack spriteBatchHack = new SpriteBatchHack();
 
         public ProjectorSystem()
         {
@@ -661,7 +593,9 @@ namespace ImmersiveProjector
             var origScreenLastPosition = Main.screenLastPosition;
 
             FieldInfo _activeEngineInfo = typeof(Lighting).GetField("_activeEngine", BindingFlags.Static | BindingFlags.NonPublic);
-            var origActiveEngine = _activeEngineInfo.GetValue(null);
+            ILightingEngine origActiveEngine = (ILightingEngine)_activeEngineInfo.GetValue(null);
+            origLightingEngineCache = origActiveEngine;
+            lightingCombination = (ProjectorData.LightingSourceFlag)structure.data.lightingSource;
 
             var origLiquidRenderer = LiquidRenderer.Instance;
             LiquidRenderer.Instance = projectorLiquidRenderer;
@@ -717,11 +651,13 @@ namespace ImmersiveProjector
             }
             else
             {
-                structure.updateCounter += MathF.Pow(structure.data.updateFreq, 2);
+                structure.updateCounter += MathF.Pow(structure.data.lightFreq, 2);
                 if (structure.updateCounter >= 1)
                 {
                     WritePerframeLightsTo(projectorLightingEngine);
-                    structure.updateCounter -= 1;
+                    // add a random offset to make updates out of sync
+                    // and prevent flooding at some point
+                    structure.updateCounter -= 1 + Main.rand.NextFloat() * (1 - structure.data.lightFreq);
                     var stateInfo = typeof(LightingEngine).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
                     // SavePerframeLightsFrom(projectorLightingEngine);
                     // The first 2 states are
@@ -731,12 +667,25 @@ namespace ImmersiveProjector
                     if ((int)stateInfo.GetValue(projectorLightingEngine) >= 2)
                     {
                         // Finish the last 2 states (Scan and Blur)
-                        currentEngine.ProcessArea(lightingArea);
+                        int newPadding = 23;
+                        Rectangle uninflate = lightingArea;
+                        uninflate.Inflate(newPadding - 28, newPadding - 28);
+                        currentEngine.ProcessArea(uninflate);
                     }
                     else
                         stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
                 }
             }
+            referenceLightingCache.Clear();
+            for (int i = lightingArea.X; i < lightingArea.X + lightingArea.Width; i++)
+                for (int j = lightingArea.Y; j < lightingArea.Y + lightingArea.Height; j++)
+                {
+                    Vector2 referencePosition = ((new Vector2(i * 16 + 8, j * 16 + 8) - structure.data.sourcePoint)
+                                                .RotatedBy(structure.data.targetRotation)
+                                                * structure.data.targetScale
+                                                + structure.data.targetPoint) / 16f;
+                    referenceLightingCache[(i, j)] = origLightingEngineCache.GetColor((int)referencePosition.X, (int)referencePosition.Y) * Lighting.GlobalBrightness;
+                }
 
 
 
@@ -869,11 +818,12 @@ namespace ImmersiveProjector
             if (structure.data.captureSolid != (int)ProjectorData.CaptureSolidFlag.None)
             {
                 projectorTileDrawing.PreDrawTiles(false, true, true);
-                Main.spriteBatch.Begin(SpriteSortMode.BackToFront, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
+                Main.spriteBatch.Begin(expandFlag ? SpriteSortMode.Deferred : SpriteSortMode.BackToFront, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
                     Main.Rasterizer, null, expandFlag ? Matrix.Identity : Matrix.CreateScale(structure.data.targetScale));
                 if (structure.data.captureSolid == (int)ProjectorData.CaptureSolidFlag.All)
-                    projectorTileDrawing.Draw(false, false /* Unused */, false, -1);
-                HackSpriteBatchScale(Main.spriteBatch, 1 + 0.1f / 16f / structure.data.targetScale);
+                    projectorTileDrawing.Draw(false, false /* Unused */, true, -1);
+                if (!expandFlag)
+                    spriteBatchHack.HackSpriteBatchScale(Main.spriteBatch, 1 + 0.1f / 16f / structure.data.targetScale);
                 Main.spriteBatch.End();
             }
 
@@ -952,10 +902,11 @@ namespace ImmersiveProjector
             if (structure.data.captureSolid != (int)ProjectorData.CaptureSolidFlag.None)
             {
                 projectorTileDrawing.PreDrawTiles(true, true, false);
-                Main.spriteBatch.Begin(SpriteSortMode.BackToFront, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
+                Main.spriteBatch.Begin(expandFlag ? SpriteSortMode.Deferred : SpriteSortMode.BackToFront, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
                     Main.Rasterizer, null, expandFlag ? Matrix.Identity : Matrix.CreateScale(structure.data.targetScale));
-                projectorTileDrawing.Draw(true, false /* Unused */, false, -1);
-                HackSpriteBatchScale(Main.spriteBatch, 1 + 0.5f / 16f / structure.data.targetScale);
+                projectorTileDrawing.Draw(true, false /* Unused */, true, -1);
+                if (!expandFlag)
+                    spriteBatchHack.HackSpriteBatchScale(Main.spriteBatch, 1 + 0.5f / 16f / structure.data.targetScale);
                 Main.spriteBatch.End();
             }
 
@@ -1147,11 +1098,11 @@ namespace ImmersiveProjector
                 new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB, alpha):
                 new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB) * alpha;
             */
-            Color color = structure.data.filter == (int)ProjectorData.FilterFlag.Holographic ? Color.Blue : Color.White;
+            Color color = structure.data.filter == (int)ProjectorData.FilterFlag.Holographic ? Color.Red : Color.White;
             if (structure.data.colorA != 1 || structure.data.colorH != 0 || structure.data.colorS != 0 || structure.data.colorV != 0 || color != Color.White)
             {
                 Vector3 uHSV = new Vector3(
-                    structure.data.colorH / 180f + (structure.data.filter == (int)ProjectorData.FilterFlag.Holographic ? 270 / 360f: 0),
+                    structure.data.colorH / 180f + (structure.data.filter == (int)ProjectorData.FilterFlag.Holographic ? 180 / 360f: 0),
                     structure.data.colorS / 100f,
                     structure.data.colorV / 100f
                 );
@@ -1233,11 +1184,14 @@ namespace ImmersiveProjector
                     s1 += followOffset;
                     t0 += followOffset;
                     t1 += followOffset;
-                    QuickDrawBox(structure.sourceTopLeft + followOffset, structure.data.sourceSize, color);
-                    QuickDrawLine(s0, t0, color);
-                    QuickDrawLine(s1, t1, color);
-                    QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
-                    QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
+                    if (structure.cacheNeedDraw || !findingTargetFlag)
+                    {
+                        QuickDrawBox(structure.sourceTopLeft + followOffset, structure.data.sourceSize, color);
+                        QuickDrawLine(s0, t0, color);
+                        QuickDrawLine(s1, t1, color);
+                        QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
+                        QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
+                    }
                     followOffset = structure.data.targetFollow != 0 && findingTargetFlag ?
                                    structure.cacheTargetOffset : Vector2.Zero;
                     s0 = structure.tilePosition.ToWorldCoordinates(8, 8);
@@ -1321,12 +1275,34 @@ namespace ImmersiveProjector
 
         public Color LightColorDecorator(On.Terraria.Lighting.orig_GetColor_int_int orig, int i, int j)
         {
-            Color result = orig(i, j);
             // Hack lighting engine to ensure dark tiles to be drawn
-            if(projectorProcessing)
+            if (projectorProcessing)
+            {
+                Color result;
+                switch (lightingCombination)
+                {
+                    case ProjectorData.LightingSourceFlag.Source:
+                        result = orig(i, j);
+                        break;
+                    case ProjectorData.LightingSourceFlag.Target:
+                        result = new Color(referenceLightingCache.GetValueOrDefault((i, j), Vector3.Zero));
+                        break;
+                    case ProjectorData.LightingSourceFlag.Both:
+                        result = orig(i, j);
+                        result = new Color(result.ToVector3() + referenceLightingCache.GetValueOrDefault((i, j), Vector3.Zero));
+                        break;
+                    default:
+                        result = Color.Black;
+                        break;
+                }
                 if (result.R < 1 && result.G < 1 && result.B < 1)
+                {
                     result.R = 1;
-            return result;
+                }
+                return result;
+            }
+            else
+                return orig(i, j);
         }
 
         public Color LightOverrideDecorator(On.Terraria.GameContent.Drawing.TileDrawing.orig_DrawTiles_GetLightOverride orig,
@@ -1398,13 +1374,6 @@ namespace ImmersiveProjector
 
         public void DoDrawDecorator(On.Terraria.Main.orig_DoDraw orig, Main self, GameTime gameTime)
         {
-            lock (projectorList)
-            {
-                foreach (var s in projectorList)
-                {
-                    s.cacheNeedDraw = false;
-                }
-            }
             orig(self, gameTime);
         }
 
@@ -1455,6 +1424,7 @@ namespace ImmersiveProjector
 
                     GraphicsDevice graphicsDevice = Main.graphics.GraphicsDevice;
                     RenderTargetBinding[] origTargets = graphicsDevice.GetRenderTargets();
+
                     if (origTargets.Length > 0)
                     {
                         var screenTarget = (RenderTarget2D)origTargets[0].RenderTarget;
@@ -1545,7 +1515,9 @@ namespace ImmersiveProjector
                 }
             }
             foreach (var s in drawList.OrderBy((ProjectorInstance s) => s.data.priority))
+            {
                 HookedDraw(s);
+            }
 
             if (layerFlag == (int)ProjectorData.LayerFlag.Foreground)
             {
@@ -1710,6 +1682,8 @@ namespace ImmersiveProjector
             FieldInfo engineInfo = typeof(Lighting).GetField("NewEngine", BindingFlags.Static | BindingFlags.NonPublic);
             SavePerframeLightsFrom((LightingEngine)engineInfo.GetValue(null));
 
+            foreach (var structure in projectorList)
+                structure.cacheNeedDraw = false;
             ListInWorld.RemoveAll((ProjectorInstance s) =>
             {
                 TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
@@ -1762,30 +1736,43 @@ namespace ImmersiveProjector
 
         // Hack for XNA sprite batch
         // Hack XNA sprite batch by adding scales to eradicate gaps between tiles
-        public void HackSpriteBatchScale(SpriteBatch spriteBatch, float scaleFactor)
+        public class SpriteBatchHack
         {
-            Type typeOfSpriteInfo = typeof(SpriteBatch).Assembly.GetTypes().Where((x) => x.IsNestedPrivate && x.Name.Equals("SpriteInfo")).ToArray()[0];
-            Type arrayOfSpriteInfo = typeOfSpriteInfo.MakeArrayType();
+            public Type typeOfSpriteInfo;
+            public Type arrayOfSpriteInfo;
+            public FieldInfo spriteInfosField;
+            public FieldInfo numSpritesField;
+            public FieldInfo destinationWField;
+            public FieldInfo destinationHField;
+            public FieldInfo depthField;
 
-            var spriteInfosField = typeof(SpriteBatch).GetField("spriteInfos", BindingFlags.Instance | BindingFlags.NonPublic);
-            Array spriteInfos = (Array)spriteInfosField.GetValue(spriteBatch);
-
-            var numSpritesField = typeof(SpriteBatch).GetField("numSprites", BindingFlags.Instance | BindingFlags.NonPublic);
-            int numSprites = (int)numSpritesField.GetValue(spriteBatch);
-
-            var destinationWField = typeOfSpriteInfo.GetField("destinationW", BindingFlags.Public | BindingFlags.Instance);
-            var destinationHField = typeOfSpriteInfo.GetField("destinationH", BindingFlags.Public | BindingFlags.Instance);
-            var depthField = typeOfSpriteInfo.GetField("depth", BindingFlags.Public | BindingFlags.Instance);
-
-            for (int i = 0; i < numSprites; i++)
+            public SpriteBatchHack()
             {
-                object boxed = spriteInfos.GetValue(i);
-                float destinationH = (float)destinationHField.GetValue(boxed);
-                destinationHField.SetValue(boxed, destinationH * scaleFactor);
-                float destinationW = (float)destinationWField.GetValue(boxed);
-                destinationWField.SetValue(boxed, destinationW * scaleFactor);
-                depthField.SetValue(boxed, 1 - i / (float)(numSprites + 1));
-                spriteInfos.SetValue(boxed, i);
+                typeOfSpriteInfo = typeof(SpriteBatch).Assembly.GetTypes().Where((x) => x.IsNestedPrivate && x.Name.Equals("SpriteInfo")).ToArray()[0];
+                arrayOfSpriteInfo = typeOfSpriteInfo.MakeArrayType();
+                spriteInfosField = typeof(SpriteBatch).GetField("spriteInfos", BindingFlags.Instance | BindingFlags.NonPublic);
+                numSpritesField = typeof(SpriteBatch).GetField("numSprites", BindingFlags.Instance | BindingFlags.NonPublic);
+                destinationWField = typeOfSpriteInfo.GetField("destinationW", BindingFlags.Public | BindingFlags.Instance);
+                destinationHField = typeOfSpriteInfo.GetField("destinationH", BindingFlags.Public | BindingFlags.Instance);
+                depthField = typeOfSpriteInfo.GetField("depth", BindingFlags.Public | BindingFlags.Instance);
+            }
+
+            public void HackSpriteBatchScale(SpriteBatch spriteBatch, float scaleFactor)
+            {
+
+                Array spriteInfos = (Array)spriteInfosField.GetValue(spriteBatch);
+                int numSprites = (int)numSpritesField.GetValue(spriteBatch);
+
+                for (int i = 0; i < numSprites; i++)
+                {
+                    object boxed = spriteInfos.GetValue(i);
+                    float destinationH = (float)destinationHField.GetValue(boxed);
+                    destinationHField.SetValue(boxed, destinationH * scaleFactor);
+                    float destinationW = (float)destinationWField.GetValue(boxed);
+                    destinationWField.SetValue(boxed, destinationW * scaleFactor);
+                    depthField.SetValue(boxed, 1 - i / (float)(numSprites + 1));
+                    spriteInfos.SetValue(boxed, i);
+                }
             }
         }
 

@@ -480,11 +480,16 @@ namespace ImmersiveProjector.UI
 			};
 			page.Append(captureCreatureVPanel);
 
-
+			UIHorizontalSeparator sep;
+			sep = new UIHorizontalSeparator();
+			sep.Width.Set(0, 1);
+			sep.Top.Set(-(tabHeight[index] - 190), 1);
+			sep.Color = Color.White * 0.1f;
+			page.Append(sep);
 
 			TogglePanel captureLayerVPanel = new TogglePanel(4, toggleItemTexture, new Rectangle(0, 32 * 4, 32, 32), panelBackground);
 			captureLayerVPanel.Width.Set(0, 1);
-			captureLayerVPanel.Top.Set(-(tabHeight[index] - 220), 1);
+			captureLayerVPanel.Top.Set(-(tabHeight[index] - 200), 1);
 			captureLayerVPanel.Height.Set(40, 0);
 			captureLayerVPanel.configName = ImmersiveProjector.ModTranslate("CaptureLayers", "Config.");
 			captureLayerVPanel.bindedValue = typeof(ProjectorData).GetProperty("layer");
@@ -507,10 +512,44 @@ namespace ImmersiveProjector.UI
 			PriorityVPanel.bindedValue = typeof(ProjectorData).GetProperty("priority");
 			sliderPanels.Add(PriorityVPanel);
 			PriorityVPanel.Width.Set(0, 1);
-			PriorityVPanel.Top.Set(-(tabHeight[index] - 260), 1);
+			PriorityVPanel.Top.Set(-(tabHeight[index] - 240), 1);
 			PriorityVPanel.Height.Set(40, 0);
 			page.Append(PriorityVPanel);
 
+			sep = new UIHorizontalSeparator();
+			sep.Width.Set(0, 1);
+			sep.Top.Set(-(tabHeight[index] - 290), 1);
+			sep.Color = Color.White * 0.1f;
+			page.Append(sep);
+
+			TogglePanel captureLightingSourceVPanel = new TogglePanel(3, toggleItemTexture, new Rectangle(0, 32 * 4, 32, 32), panelBackground);
+			captureLightingSourceVPanel.Width.Set(0, 1);
+			captureLightingSourceVPanel.Top.Set(-(tabHeight[index] - 300), 1);
+			captureLightingSourceVPanel.Height.Set(40, 0);
+			captureLightingSourceVPanel.configName = ImmersiveProjector.ModTranslate("CaptureLightingSources", "Config.");
+			captureLightingSourceVPanel.bindedValue = typeof(ProjectorData).GetProperty("lightingSource");
+			togglePanels.Add(captureLightingSourceVPanel);
+
+			captureLightingSourceVPanel.tooltips = new string[]
+			{
+                ImmersiveProjector.ModTranslate("CaptureLightingSourcesS", "Config."),
+                ImmersiveProjector.ModTranslate("CaptureLightingSourcesT", "Config."),
+                ImmersiveProjector.ModTranslate("CaptureLightingSourcesB", "Config."),
+			};
+			page.Append(captureLightingSourceVPanel);
+
+			SliderPanel FreqencyLPanel = new SliderPanel(0.05f, 1, Color.OrangeRed, panelBackground, null);
+			FreqencyLPanel.valueSnapping = 0.01f;
+			FreqencyLPanel.configName = ImmersiveProjector.ModTranslate("CaptureLightFreqency", "Config.");
+			FreqencyLPanel.tooltip = ImmersiveProjector.ModTranslate("CaptureLightFreqencyToolTip", "Config.");
+			FreqencyLPanel.bindedValue = typeof(ProjectorData).GetProperty("lightFreq");
+			sliderPanels.Add(FreqencyLPanel);
+			FreqencyLPanel.Width.Set(0, 1);
+			FreqencyLPanel.Top.Set(-(tabHeight[index] - 340), 1);
+			FreqencyLPanel.Height.Set(40, 0);
+			page.Append(FreqencyLPanel);
+
+			/*
 			SliderPanel FreqencyVPanel = new SliderPanel(0.05f, 1, Color.OrangeRed, panelBackground, null);
 			FreqencyVPanel.valueSnapping = 0.01f;
 			FreqencyVPanel.configName = ImmersiveProjector.ModTranslate("CaptureFreqency", "Config.");
@@ -521,6 +560,7 @@ namespace ImmersiveProjector.UI
 			FreqencyVPanel.Top.Set(-(tabHeight[index] - 300), 1);
 			FreqencyVPanel.Height.Set(40, 0);
 			page.Append(FreqencyVPanel);
+			*/
 		}
 
 		private void InitializeBehaviorPage(UIElement page, int index)
@@ -691,7 +731,7 @@ namespace ImmersiveProjector.UI
 			currentPage = -1;
 			tweenToPage = 1;
             tabNames = new string[] { "Prefabs", "SelectArea", "Settings", "Behavior", "Color" };
-            tabHeight = new int[] {420, 420, 420, 420, 420};
+            tabHeight = new int[] {460, 460, 460, 460, 460};
             tabButtonIconFrame = new int[] {10, 4, 6, 7, 3};
 			for (var i = 0; i < tabNames.Length; i++)
 				tabNames[i] = ImmersiveProjector.ModTranslate(tabNames[i], "Config.");

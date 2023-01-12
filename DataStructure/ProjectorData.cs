@@ -44,6 +44,12 @@ namespace ImmersiveProjector.DataStructure
             BehindFurnitures = 2,
             BehindWalls = 3
         }
+        public enum LightingSourceFlag
+        {
+            Source = 0,
+            Target = 1,
+            Both = 2
+        }
 
         public enum FollowingFlag
         {
@@ -100,6 +106,7 @@ namespace ImmersiveProjector.DataStructure
         public int blending { get; set; }
         public int behavior { get; set; }
         public int layer { get; set; }
+        public int lightingSource { get; set; }
         public int sourceFollow { get; set; }
         public float sourceFollowId { get; set; }
 
@@ -147,19 +154,13 @@ namespace ImmersiveProjector.DataStructure
         public float colorV { get; set; }
         public float colorA { get; set; }
         public float parallax { get; set; }
+        public float lightFreq { get; set; }
         public float updateFreq { get; set; }
-
-        private int testMaskFlag;
-
-        public int testGetSet
-        {
-            get => testMaskFlag & 1;
-            set => testMaskFlag = (testMaskFlag & ((-1 + (1 << 1)) ^ (1))) + value;
-        }
 
         public ProjectorData()
         {
-            updateFreq = 0.5f;
+            lightFreq = 0.5f;
+            updateFreq = 1.0f;
         }
 
         public ProjectorData(Vector2 sourcePoint, Vector2 sourceSize, Vector2 targetPoint, Vector2? anchor = null, float targetScale = 1f)
@@ -183,7 +184,7 @@ namespace ImmersiveProjector.DataStructure
             center = 8 * new Vector2(MathF.Round(center.X / 8), MathF.Round(center.Y / 8));
             targetScale = 1f;
             sourcePoint = center + new Vector2(-120, -80);
-            sourceSize = Vector2.One * 320;
+            sourceSize = Vector2.One * 3200;
             targetPoint = sourcePoint - new Vector2(-240, 160);
         }
 
@@ -195,7 +196,8 @@ namespace ImmersiveProjector.DataStructure
             colorA = 1;
             colorH = colorS = colorV = 0;
             turnedOn = 1;
-            updateFreq = 0.5f;
+            lightFreq = 0.5f;
+            layer = 3;
         }
 
         public void CopyDataFrom(ProjectorData other)
