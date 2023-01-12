@@ -386,6 +386,7 @@ namespace ImmersiveProjector
             targetFollowOffset = Vector2.Zero;
 
             structure.cacheTargetOffset = Vector2.Zero;
+            structure.cacheParallaxOffset = Vector2.Zero;
             switch (structure.data.targetFollow)
             {
                 case (int)ProjectorData.FollowingFlag.Player:
@@ -426,6 +427,8 @@ namespace ImmersiveProjector
                     break;
             }
             structure.data.targetPoint += targetFollowOffset;
+            Vector2 parallaxOffset = (Main.Camera.Center - (structure.tilePosition.ToWorldCoordinates())) * structure.data.parallax;
+            structure.data.targetPoint += parallaxOffset;
 
             Vector2 targetBoundingR = targetSize.RotatedBy(structure.data.targetRotation / 180f * MathF.PI) * 0.5f;
             targetBoundingR.X = MathF.Abs(targetBoundingR.X);
@@ -443,7 +446,7 @@ namespace ImmersiveProjector
                 (targetBoundTopLeft.X > Main.screenPosition.X + Main.screenWidth || targetBoundBottomRight.X < Main.screenPosition.X ||
                  targetBoundTopLeft.Y > Main.screenPosition.Y + Main.screenHeight || targetBoundBottomRight.Y < Main.screenPosition.Y))
             {
-                structure.data.targetPoint -= targetFollowOffset;
+                structure.data.targetPoint -= targetFollowOffset + parallaxOffset;
                 hitFlag = false;
                 targetTopLeft = targetBottomRight = Vector2.Zero;
                 return false;
@@ -469,7 +472,7 @@ namespace ImmersiveProjector
 
             if (targetBoundTopLeft.X > targetBoundBottomRight.X || targetBoundTopLeft.Y > targetBoundBottomRight.Y)
             {
-                structure.data.targetPoint -= targetFollowOffset;
+                structure.data.targetPoint -= targetFollowOffset + parallaxOffset;
                 hitFlag = false;
                 targetTopLeft = targetBottomRight = Vector2.Zero;
                 return false;
@@ -529,6 +532,7 @@ namespace ImmersiveProjector
             targetSize = targetBottomRight - targetTopLeft;
             if (targetSize.X <= 0 || targetSize.Y <= 0)
                 return false;
+            structure.cacheParallaxOffset = parallaxOffset;
             return true;
         }
 
@@ -1190,6 +1194,7 @@ namespace ImmersiveProjector
             {
                 structure.data.targetPoint -= targetFollowOffset;
             }
+            structure.data.targetPoint -= structure.cacheParallaxOffset;
         }
 
         public void DrawStructureFrame()
@@ -1248,6 +1253,16 @@ namespace ImmersiveProjector
                     QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
                     QuickDrawBox(structure.targetTopLeft + followOffset, structure.data.targetSize, color);
                     QuickDrawBox(targetBoundTopLeft + followOffset, targetBoundingR * 2, color);
+                    if (structure.cacheParallaxOffset.Length() > 0)
+                    {
+                        color = Color.Pink;
+                        QuickDrawLine(structure.tilePosition.ToWorldCoordinates() + followOffset, Main.Camera.Center, color);
+                        if (findingTargetFlag)
+                        {
+                            QuickDrawLine(structure.data.targetPoint + followOffset, followOffset + structure.data.targetPoint + structure.cacheParallaxOffset, color);
+                            QuickDrawBox(targetBoundTopLeft + structure.cacheParallaxOffset + followOffset, targetBoundingR * 2, color);
+                        }
+                    }
                 }
                 else
                 {
@@ -1262,6 +1277,13 @@ namespace ImmersiveProjector
                     QuickDrawBox(structure.sourceTopLeft, structure.data.sourceSize, color);
                     QuickDrawBox(structure.targetTopLeft, structure.data.targetSize, color);
                     QuickDrawBox(targetBoundTopLeft, targetBoundingR * 2, color);
+                    if (structure.cacheParallaxOffset.Length() > 0)
+                    {
+                        color = Color.Pink;
+                        QuickDrawLine(structure.data.targetPoint, structure.data.targetPoint + structure.cacheParallaxOffset, color);
+                        QuickDrawLine(structure.tilePosition.ToWorldCoordinates(), Main.Camera.Center, color);
+                        QuickDrawBox(targetBoundTopLeft + structure.cacheParallaxOffset, targetBoundingR * 2, color);
+                    }
                 }
                 Main.spriteBatch.End();
 

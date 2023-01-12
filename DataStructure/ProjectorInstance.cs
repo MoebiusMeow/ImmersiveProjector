@@ -32,6 +32,7 @@ namespace ImmersiveProjector.DataStructure
         public Vector2 cacheTopLeft;
         public Vector2 cacheBottomRight;
         public Vector2 cacheTargetOffset;
+        public Vector2 cacheParallaxOffset;
         public bool cacheHitFlag;
         public bool cacheNeedDraw;
         public Vector2 cacheSourceOffset;

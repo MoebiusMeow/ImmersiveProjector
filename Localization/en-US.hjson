@@ -78,6 +78,9 @@ Mods: {
 			CaptureFreqency: Lighting Freqency 
 			CaptureFreqencyToolTip: Reduce lighting freqency for higher performance
 
+			CaptureParallax: Parallax 
+			CaptureParallaxToolTip: The length of the pink line
+
 			Red: Red
 			Green: Green
 			Blue: Blue
