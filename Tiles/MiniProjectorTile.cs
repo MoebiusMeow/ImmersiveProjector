@@ -78,8 +78,11 @@ namespace ImmersiveProjector.Tiles
 
 		public override void KillTile(int i, int j, ref bool fail, ref bool effectOnly, ref bool noItem)
 		{
-			Item.NewItem(new EntitySource_TileBreak(i, j), i * 16, j * 16, 32, 32, ModContent.ItemType<MiniProjector>());
-			ModContent.GetInstance<ProjectorTileEntity>().Kill(i, j);
+			if (!fail)
+			{
+				Item.NewItem(new EntitySource_TileBreak(i, j), i * 16, j * 16, 32, 32, ModContent.ItemType<MiniProjector>());
+				ModContent.GetInstance<ProjectorTileEntity>().Kill(i, j);
+			}
 			base.KillTile(i, j, ref fail, ref effectOnly, ref noItem);
 		}
 

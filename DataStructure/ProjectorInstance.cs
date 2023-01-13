@@ -55,7 +55,7 @@ namespace ImmersiveProjector.DataStructure
 
         private ProjectorInstance(Point tilePosition)
         {
-            data = new ProjectorData(Vector2.Zero, Vector2.One * 100, Vector2.Zero);
+            data = new ProjectorData();
             lightingEngine = new LightingEngine();
             lightingEngine.Rebuild();
             dustIdentities = new List<Dust>();

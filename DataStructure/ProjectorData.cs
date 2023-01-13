@@ -156,14 +156,18 @@ namespace ImmersiveProjector.DataStructure
         public float parallax { get; set; }
         public float lightFreq { get; set; }
         public float updateFreq { get; set; }
+        public float colorR { get; set; }
+        public float colorG { get; set; }
+        public float colorB { get; set; }
+
 
         public ProjectorData()
         {
-            lightFreq = 0.5f;
-            updateFreq = 1.0f;
+            SetDefault();
         }
 
-        public ProjectorData(Vector2 sourcePoint, Vector2 sourceSize, Vector2 targetPoint, Vector2? anchor = null, float targetScale = 1f)
+        /*
+        private ProjectorData(Vector2 sourcePoint, Vector2 sourceSize, Vector2 targetPoint, Vector2? anchor = null, float targetScale = 1f)
         {
             this.anchor = anchor != null ? (Vector2)anchor : Vector2.Zero;
             this.sourcePoint = sourcePoint;
@@ -171,6 +175,7 @@ namespace ImmersiveProjector.DataStructure
             this.targetPoint = targetPoint;
             this.targetScale = targetScale;
         }
+        */
 
         public Vector2 targetSize { get => sourceSize * targetScale; }
         public Vector2 sourceTopLeft { get => sourcePoint - anchor * sourceSize; }
@@ -184,20 +189,24 @@ namespace ImmersiveProjector.DataStructure
             center = 8 * new Vector2(MathF.Round(center.X / 8), MathF.Round(center.Y / 8));
             targetScale = 1f;
             sourcePoint = center + new Vector2(-120, -80);
-            sourceSize = Vector2.One * 3200;
+            sourceSize = Vector2.One * 320;
             targetPoint = sourcePoint - new Vector2(-240, 160);
         }
 
-        public void SetDefault(Vector2 center)
+        public void SetDefault(Vector2? center = null)
         {
-            SetDefaultPosition(center);
+            if (center != null)
+                SetDefaultPosition((Vector2)center);
             captureSolid = 2;
             captureWall = 1;
             colorA = 1;
             colorH = colorS = colorV = 0;
             turnedOn = 1;
-            lightFreq = 0.5f;
             layer = 3;
+
+            lightFreq = 0.5f;
+            updateFreq = 1.0f;
+            colorR = colorG = colorB = 1;
         }
 
         public void CopyDataFrom(ProjectorData other)

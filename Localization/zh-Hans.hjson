@@ -73,12 +73,32 @@ Mods: {
 			CaptureLayersBF: 家具后
 			CaptureLayersBW: 墙体后
 
+			CaptureLightingSources: 光源选择
+			CaptureLightingSourcesS: 原始区域
+			CaptureLightingSourcesT: 目标区域 (更快) 
+			CaptureLightingSourcesB: 二者之和
+
 			CapturePriority: 层叠优先级
 			CapturePriorityToolTip: 重叠的投影间的相互优先级
+
+			CaptureLightFreqency: 光照频率
+			CaptureLightFreqencyToolTip: 通过减少光照更新来提升性能
+
+			CaptureFreqency: 更新频率
+			CaptureFreqencyToolTip: 通过缓存图像来提升性能 (需要显存)
+
+			CaptureParallax: 视差 
+			CaptureParallaxToolTip: 粉色视差线的长度比例
 
 			Red: 红
 			Green: 绿
 			Blue: 蓝
+			ColorR: 基础红色
+			ColorG: 基础绿色
+			ColorB: 基础蓝色
+			ColorH: 色相
+			ColorS: 饱和度
+			ColorV: 亮度
 			Opacity: 不透明度
 
 			CaptureBehavior: 影像触碰玩家时

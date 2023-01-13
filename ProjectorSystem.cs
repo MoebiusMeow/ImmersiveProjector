@@ -677,16 +677,22 @@ namespace ImmersiveProjector
                         stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
                 }
             }
-            referenceLightingCache.Clear();
-            for (int i = lightingArea.X; i < lightingArea.X + lightingArea.Width; i++)
-                for (int j = lightingArea.Y; j < lightingArea.Y + lightingArea.Height; j++)
-                {
-                    Vector2 referencePosition = ((new Vector2(i * 16 + 8, j * 16 + 8) - structure.data.sourcePoint)
-                                                .RotatedBy(structure.data.targetRotation)
-                                                * structure.data.targetScale
-                                                + structure.data.targetPoint) / 16f;
-                    referenceLightingCache[(i, j)] = origLightingEngineCache.GetColor((int)referencePosition.X, (int)referencePosition.Y) * Lighting.GlobalBrightness;
-                }
+            if (structure.data.lightingSource != (int)ProjectorData.LightingSourceFlag.Source)
+            {
+                referenceLightingCache.Clear();
+                bool flipX = (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Horizontal);
+                bool flipY = (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Vertical);
+                for (int i = lightingArea.X - 1; i < lightingArea.X + lightingArea.Width + 1; i++)
+                    for (int j = lightingArea.Y - 1; j < lightingArea.Y + lightingArea.Height + 1; j++)
+                    {
+                        Vector2 referencePosition = (((new Vector2(i * 16 + 8, j * 16 + 8) - structure.data.sourcePoint)
+                                                    * new Vector2(flipX ? -1 : 1, flipY ? -1 : 1))
+                                                    .RotatedBy(structure.data.targetRotation)
+                                                    * structure.data.targetScale
+                                                    + structure.data.targetPoint) / 16f;
+                        referenceLightingCache[(i, j)] = origLightingEngineCache.GetColor((int)referencePosition.X, (int)referencePosition.Y) * Lighting.GlobalBrightness;
+                    }
+            }
 
 
 
@@ -1099,8 +1105,12 @@ namespace ImmersiveProjector
                 new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB, alpha):
                 new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB) * alpha;
             */
-            Color color = structure.data.filter == (int)ProjectorData.FilterFlag.Holographic ? Color.Red : Color.White;
-            if (structure.data.colorA != 1 || structure.data.colorH != 0 || structure.data.colorS != 0 || structure.data.colorV != 0 || color != Color.White)
+            Color color = new Color(structure.data.colorR, structure.data.colorG, structure.data.colorB);
+            if (structure.data.filter == (int)ProjectorData.FilterFlag.Holographic)
+            {
+                color.G = color.B = 0;
+            }
+            if (alpha != 1 || structure.data.colorH != 0 || structure.data.colorS != 0 || structure.data.colorV != 0 || color != Color.White)
             {
                 Vector3 uHSV = new Vector3(
                     structure.data.colorH / 180f + (structure.data.filter == (int)ProjectorData.FilterFlag.Holographic ? 180 / 360f: 0),
@@ -1109,7 +1119,7 @@ namespace ImmersiveProjector
                 );
                 projectorFilterEffect.Parameters["uHSV"].SetValue(uHSV);
                 projectorFilterEffect.Parameters["uRGB"].SetValue(color.ToVector3());
-                projectorFilterEffect.Parameters["uAlpha"].SetValue(structure.data.colorA);
+                projectorFilterEffect.Parameters["uAlpha"].SetValue(alpha);
                 projectorFilterEffect.Parameters["uPrem"].SetValue(structure.data.blending != (int)ProjectorData.BlendingFlag.Additive);
                 projectorFilterEffect.CurrentTechnique.Passes["HSV"].Apply();
             }

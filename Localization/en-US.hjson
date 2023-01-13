@@ -92,9 +92,12 @@ Mods: {
 			Red: Red
 			Green: Green
 			Blue: Blue
-			ColorH: Hue offset
-			ColorS: Saturation offset
-			ColorV: Value offset
+			ColorR: Base Red
+			ColorG: Base Green
+			ColorB: Base Blue
+			ColorH: Hue
+			ColorS: Saturation
+			ColorV: Brightness
 			Opacity: Opacity
 
 			CaptureBehavior: When players enter
