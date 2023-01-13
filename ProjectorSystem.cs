@@ -160,7 +160,6 @@ namespace ImmersiveProjector
             On.Terraria.Lighting.GetColor_int_int += LightColorDecorator;
             On.Terraria.Graphics.TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects += TileBatchDrawDecorator;
             On.Terraria.Graphics.TileBatch.InternalDraw += TileBatchInternalDrawDecorator;
-            On.Terraria.Main.DoDraw += DoDrawDecorator;
             On.Terraria.Main.DrawCachedNPCs += DrawCachedNPCsDecorator;
             On.Terraria.Lighting.Initialize += LightingInitializeDecorator;
             On.Terraria.Dust.NewDust += NewDustDecorator;
@@ -189,7 +188,6 @@ namespace ImmersiveProjector
             On.Terraria.Lighting.GetColor_int_int -= LightColorDecorator;
             On.Terraria.Graphics.TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects -= TileBatchDrawDecorator;
             On.Terraria.Graphics.TileBatch.InternalDraw -= TileBatchInternalDrawDecorator;
-            On.Terraria.Main.DoDraw -= DoDrawDecorator;
             On.Terraria.Main.DrawCachedNPCs -= DrawCachedNPCsDecorator;
             On.Terraria.Lighting.Initialize -= LightingInitializeDecorator;
             On.Terraria.Dust.NewDust -= NewDustDecorator;
@@ -665,16 +663,25 @@ namespace ImmersiveProjector
                     // EngineState.MinimapUpdate and EngineState.ExportMetrics
                     // we only use lighting engine to obtain lighting data
                     // stateInfo.SetValue(projectorLightingEngine, 2);
-                    if ((int)stateInfo.GetValue(projectorLightingEngine) >= 2)
+                    int newPadding = 23;
+                    Rectangle uninflate = lightingArea;
+                    uninflate.Inflate(newPadding - 28, newPadding - 28);
+                    if (!CaptureManager.Instance.IsCapturing)
                     {
-                        // Finish the last 2 states (Scan and Blur)
-                        int newPadding = 23;
-                        Rectangle uninflate = lightingArea;
-                        uninflate.Inflate(newPadding - 28, newPadding - 28);
-                        currentEngine.ProcessArea(uninflate);
+                        if ((int)stateInfo.GetValue(projectorLightingEngine) >= 2)
+                        {
+                            // Finish the last 2 states (Scan and Blur)
+                            currentEngine.ProcessArea(uninflate);
+                        }
+                        else
+                            stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
                     }
                     else
-                        stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
+                    {
+                        stateInfo.SetValue(projectorLightingEngine, 2);
+                        for (int i = 0; i < 2; i++)
+                            currentEngine.ProcessArea(uninflate);
+                    }
                 }
             }
             if (structure.data.lightingSource != (int)ProjectorData.LightingSourceFlag.Source)
@@ -1360,16 +1367,12 @@ namespace ImmersiveProjector
                 throw new Exception("Immersive Projector: Dust.UpdateDust hook location not found");
             if (!cursor.Previous.MatchLdsfld(out var value))
                 throw new Exception("Immersive Projector: Dust.UpdateDust hook location not found");
-            // ILLabel afterLoop = cursor.DefineLabel();
             ILLabel noReturn = cursor.DefineLabel();
             cursor.GotoLabel(elseBranch);
             cursor.EmitDelegate<Func<bool>>(() => { return this.overrideDustUpdate; });
             cursor.Emit(OpCodes.Brfalse, noReturn);
             cursor.Emit(OpCodes.Ret);
             cursor.MarkLabel(noReturn);
-            // cursor.GotoNext(i => i.MatchBlt(out var label));
-            // cursor.GotoNext();
-            // cursor.MarkLabel(afterLoop);
         }
 
         public void LightingInitializeDecorator(On.Terraria.Lighting.orig_Initialize orig)
@@ -1379,12 +1382,10 @@ namespace ImmersiveProjector
             // projectorLightingEngine.Rebuild();
             projectorLegacyLighting.Rebuild();
             foreach (var projector in projectorList)
+            {
+                projector.updateCounter = 1f;
                 projector.lightingEngine.Rebuild();
-        }
-
-        public void DoDrawDecorator(On.Terraria.Main.orig_DoDraw orig, Main self, GameTime gameTime)
-        {
-            orig(self, gameTime);
+            }
         }
 
         public void DrawCachedNPCsDecorator(On.Terraria.Main.orig_DrawCachedNPCs orig, Main self,
@@ -1441,7 +1442,7 @@ namespace ImmersiveProjector
 
                         EnsureOverlayRT(screenTarget.Width, screenTarget.Height);
                         graphicsDevice.SetRenderTarget(overlayRT);
-                        // graphicsDevice.Clear(Color.Transparent);
+                        graphicsDevice.Clear(Color.Transparent);
                         Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque);
                         Main.spriteBatch.Draw(screenTarget, Vector2.Zero, Color.White);
                         Main.spriteBatch.End();
@@ -1450,7 +1451,7 @@ namespace ImmersiveProjector
 
                         graphicsDevice.SetRenderTarget(screenTarget);
 
-                        Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend);
+                        Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque);
                         Main.spriteBatch.Draw(overlayRT, Vector2.Zero, Color.White);
                         Main.spriteBatch.End();
                     }
