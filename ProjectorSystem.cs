@@ -599,6 +599,7 @@ namespace ImmersiveProjector
 
             var origLiquidRenderer = LiquidRenderer.Instance;
             LiquidRenderer.Instance = projectorLiquidRenderer;
+            projectorLiquidRenderer._liquidTextures = origLiquidRenderer._liquidTextures;
 
             GraphicsDevice graphicDevice = Main.graphics.GraphicsDevice;
 
@@ -1292,8 +1293,7 @@ namespace ImmersiveProjector
                         result = new Color(result.ToVector3() + referenceLightingCache.GetValueOrDefault((i, j), Vector3.Zero));
                         break;
                     default:
-                        result = Color.Black;
-                        break;
+                        return Color.Black;
                 }
                 if (result.R < 1 && result.G < 1 && result.B < 1)
                 {
