@@ -655,7 +655,7 @@ namespace ImmersiveProjector.UI
 			sep.Color = Color.White * 0.1f;
 			page.Append(sep);
 
-			SliderPanel ParallaxVPanel = new SliderPanel(-1, 1, Color.OrangeRed, panelBackground, null);
+			SliderPanel ParallaxVPanel = new SliderPanel(-1, 1, Color.Purple, panelBackground, null);
 			ParallaxVPanel.valueSnapping = 0.05f;
 			ParallaxVPanel.configName = ImmersiveProjector.ModTranslate("CaptureParallax", "Config.");
 			ParallaxVPanel.tooltip = ImmersiveProjector.ModTranslate("CaptureParallaxToolTip", "Config.");

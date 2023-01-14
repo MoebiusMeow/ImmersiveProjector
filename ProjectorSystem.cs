@@ -109,6 +109,14 @@ namespace ImmersiveProjector
         {
         }
 
+        public override void OnWorldUnload()
+        {
+            if (projectorList != null)
+                projectorList.Clear();
+            if (uiSystem.userInterface.CurrentState is ProjectorUI)
+                uiSystem.userInterface.SetState(null);
+        }
+
         public override void OnWorldLoad()
         {
             inited = false;
@@ -460,9 +468,10 @@ namespace ImmersiveProjector
             targetTopLeft = new Vector2(MathF.Floor(targetTopLeft.X), MathF.Floor(targetTopLeft.Y)) * align + structure.data.targetTopLeft;
 
             targetSize = targetBottomRight - targetTopLeft;
+            structure.cacheParallaxOffset = parallaxOffset;
+            structure.data.targetPoint -= targetFollowOffset + parallaxOffset;
             if (targetSize.X <= 0 || targetSize.Y <= 0)
                 return false;
-            structure.cacheParallaxOffset = parallaxOffset;
             return true;
         }
 
@@ -527,6 +536,8 @@ namespace ImmersiveProjector
             var targetBottomRight = structure.cacheBottomRight;
             var targetFollowOffset = structure.cacheTargetOffset;
             var hitFlag = structure.cacheHitFlag;
+            structure.data.targetPoint += targetFollowOffset;
+            structure.data.targetPoint += structure.cacheParallaxOffset;
             if (structure.data.behavior != (int)ProjectorData.BehaviorFlag.None)
             {
                 if (hitFlag)
@@ -1159,10 +1170,7 @@ namespace ImmersiveProjector
 
             // QuickDrawBoxLocal(Vector2.One * 400, new Vector2(Main.screenWidth, Main.screenHeight) - Vector2.One * 800, Color.White);
             Main.spriteBatch.End();
-            if (targetFollowOffset.Length() > 0 || sourceFollowOffset.Length() > 0)
-            {
-                structure.data.targetPoint -= targetFollowOffset;
-            }
+            structure.data.targetPoint -= targetFollowOffset;
             structure.data.targetPoint -= structure.cacheParallaxOffset;
         }
 
