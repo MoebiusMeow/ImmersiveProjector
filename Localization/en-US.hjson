@@ -46,7 +46,8 @@ Mods: {
 			FlipN: No Flip
 			FlipH: Flip Horizontally
 			FlipV: Flip Vertically
-			DoubleClickResetPosition: Double click here to Reset both areas
+			DoubleClickResetPosition: Double click to Reset both areas
+			DoubleClickResetScale: Reset current scale 
 			TargetRotation: Rotate Target Area 
 
 			CaptureTiles: Capture Tiles
@@ -74,7 +75,7 @@ Mods: {
 
 			CaptureLightingSources: Lighting Source
 			CaptureLightingSourcesS: Source area
-			CaptureLightingSourcesT: Target area (faster) 
+			CaptureLightingSourcesT: Target area 
 			CaptureLightingSourcesB: Both areas 
 
 			CapturePriority: Layer Priority 
@@ -89,6 +90,8 @@ Mods: {
 			CaptureParallax: Parallax 
 			CaptureParallaxToolTip: The length of the pink line
 
+			Yes: Yes
+			No: No
 			Red: Red
 			Green: Green
 			Blue: Blue
@@ -110,6 +113,8 @@ Mods: {
 			CaptureFollowSId: (Select index)
 			CaptureFollowT: Target area following
 			CaptureFollowTId: (Select index)
+			CaptureFollowFlip: Sync flip
+			CaptureFollowRotation: Rotation
 			CaptureFollowN: Nothing
 			CaptureFollowP: A player
 			CaptureFollowTN: A town NPC

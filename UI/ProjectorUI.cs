@@ -76,6 +76,7 @@ namespace ImmersiveProjector.UI
 		public HandleGridGroup sourceGrid, targetGrid;
 		public ProjectorInstance focusedInstance = null;
 		public ProjectorData tempData = null;
+		public List<(string, ProjectorData)> presetData = null;
 
 		public bool configFlipH;
 		public float testF;
@@ -174,6 +175,12 @@ namespace ImmersiveProjector.UI
 			return 2 * MathF.Abs(tweenValue - 0.5f);
 		}
 
+		public void initializePresetData()
+		{
+			presetData ??= new List<(string, ProjectorData)>();
+			presetData.Clear();
+		}
+
 		public void InitializePage(UIElement page, int index)
 		{
 			UIText headerText = new UIText(ImmersiveProjector.ModTranslate("Description" + index.ToString(), "Config."), 0.5f, true);
@@ -246,7 +253,7 @@ namespace ImmersiveProjector.UI
             uiList.ListPadding = 14f;
             uiList.PaddingTop = 10f;
             UIScrollbar uiScrollbar = new UIScrollbar();
-            uiScrollbar.SetView(100f, 1000f);
+            uiScrollbar.SetView(100f, 2000f);
             uiScrollbar.Height.Set(310, 0f);
             uiScrollbar.HAlign = 1f;
             uiScrollbar.Top.Set(-360, 1f);
@@ -283,8 +290,8 @@ namespace ImmersiveProjector.UI
                 };
             for (var i = 0; i < testAssets.Length; i++)
             {
-                Asset<Texture2D> asset = Main.Assets.Request<Texture2D>("Images/UI/" + testAssets[i]);
-                PresetFrame btn = new PresetFrame(assetSlotFront, assetSlotHover, assetSlotBack, asset, -1, i.ToString() + "Testing Testing")
+                Asset<Texture2D> asset2 = Main.Assets.Request<Texture2D>("Images/UI/" + testAssets[i]);
+                PresetFrame btn2 = new PresetFrame(assetSlotFront, assetSlotHover, assetSlotBack, asset2, -1, i.ToString() + "Testing Testing")
                 {
                     // Height = new StyleDimension(28f, 0f),
                     Top = new StyleDimension(1000 + 40 * i, 0f),
@@ -292,7 +299,7 @@ namespace ImmersiveProjector.UI
                     HAlign = 0f
                 };
                 // btn.Color = Color.Aqua;
-                uiList.Add(btn);
+                uiList.Add(btn2);
             }
             UIHorizontalSeparator minorSep = new UIHorizontalSeparator();
             minorSep.Width.Set(0, 1f);
@@ -300,15 +307,15 @@ namespace ImmersiveProjector.UI
             uiList.Add(minorSep);
             for (var i = 0; i < testAssets.Length; i++)
             {
-                Asset<Texture2D> asset = Main.Assets.Request<Texture2D>("Images/UI/" + testAssets[testAssets.Length - 1]);
-                UIElement btn = new PresetFrame(assetSlotFront, assetSlotHover, assetSlotBack, asset, 1, "This is long uwu")
+                Asset<Texture2D> asset2 = Main.Assets.Request<Texture2D>("Images/UI/" + testAssets[testAssets.Length - 1]);
+                UIElement btn2 = new PresetFrame(assetSlotFront, assetSlotHover, assetSlotBack, asset2, 1, "This is long uwu")
                 {
                     // Height = new StyleDimension(28f, 0f),
                     Top = new StyleDimension(2000 + 40 * i, 0f),
                     VAlign = 0f,
                     HAlign = 0f
                 };
-                uiList.Add(btn);
+                uiList.Add(btn2);
             }
 			*/
             uiList.RecalculateChildren();
@@ -329,12 +336,29 @@ namespace ImmersiveProjector.UI
 
 			UIText text;
 			ElementEvent updateMouseOver = (UIElement o) => { ((UIPanel)o).BackgroundColor = DefaultBackground * (o.IsMouseHovering ? 1.5f : 1);  };
+			ElementEvent updateMouseOverResetScale = (UIElement o) =>
+			{
+				((UIPanel)o).BackgroundColor = DefaultBackground * (o.IsMouseHovering ? 1.5f : 1);
+				((UIText)o.Children.First()).SetText(ImmersiveProjector.ModTranslate("DoubleClickResetScale", "Config.") + " ("
+					+ (focusedInstance == null || focusedInstance.data == null ? "?" : (focusedInstance.data.targetScale * 100).ToString("0.00")) + "%)");
+			};
 			MouseEvent resetPositionAction = (UIMouseEvent evt, UIElement o) =>
 			{
 				if (focusedInstance != null && focusedInstance.data != null)
 				{
 					var s = focusedInstance.data;
 					s.SetDefaultPosition(Main.LocalPlayer.Center);
+					sourceGrid.SetFromAnchorAndSize(s.sourcePoint, s.anchor, s.sourceSize);
+					targetGrid.SetFromAnchorAndSize(s.targetPoint, s.anchor, s.targetSize);
+				}
+			};
+
+			MouseEvent resetScaleAction = (UIMouseEvent evt, UIElement o) =>
+			{
+				if (focusedInstance != null && focusedInstance.data != null)
+				{
+					var s = focusedInstance.data;
+					s.targetScale = 1f;
 					sourceGrid.SetFromAnchorAndSize(s.sourcePoint, s.anchor, s.sourceSize);
 					targetGrid.SetFromAnchorAndSize(s.targetPoint, s.anchor, s.targetSize);
 				}
@@ -350,7 +374,7 @@ namespace ImmersiveProjector.UI
 
 			UIPanel resetPanel = new UIPanel(panelBackground, null);
 			resetPanel.Width.Set(0, 1);
-			resetPanel.Top.Set(-(tabHeight[index] - 335), 1);
+			resetPanel.Top.Set(-(tabHeight[index] - 375), 1);
 			resetPanel.Height.Set(40, 0);
 			text = new UIText(ImmersiveProjector.ModTranslate("DoubleClickResetPosition", "Config."));
 			text.HAlign = 0.5f;
@@ -359,6 +383,18 @@ namespace ImmersiveProjector.UI
 
 			resetPanel.OnUpdate += updateMouseOver;
 			resetPanel.OnDoubleClick += resetPositionAction;
+
+			UIPanel resetScalePanel = new UIPanel(panelBackground, null);
+			resetScalePanel.Width.Set(0, 1);
+			resetScalePanel.Top.Set(-(tabHeight[index] - 335), 1);
+			resetScalePanel.Height.Set(40, 0);
+			text = new UIText(ImmersiveProjector.ModTranslate("DoubleClickResetScale", "Config."));
+			text.HAlign = 0.5f;
+			resetScalePanel.Append(text);
+			page.Append(resetScalePanel);
+
+			resetScalePanel.OnUpdate += updateMouseOverResetScale;
+			resetScalePanel.OnClick += resetScaleAction;
 
 			TogglePanel snapVPanel = new TogglePanel(3, toggleItemTexture, new Rectangle(0, 256, 32, 32), panelBackground);
 			snapVPanel.Width.Set(0, 1);
@@ -649,9 +685,40 @@ namespace ImmersiveProjector.UI
 			page.Append(TargetIdVPanel);
 			page.Append(captureFollowTVPanel);
 
+			TogglePanel captureFollowFlipVPanel = new TogglePanel(2, toggleItemTexture, new Rectangle(0, 32 * 1, 32, 32), panelBackground);
+			captureFollowFlipVPanel.Width.Set(0, 0.5f);
+			captureFollowFlipVPanel.Top.Set(-(tabHeight[index] - 300), 1);
+			captureFollowFlipVPanel.Height.Set(40, 0);
+			captureFollowFlipVPanel.configName = ImmersiveProjector.ModTranslate("CaptureFollowFlip", "Config.");
+			captureFollowFlipVPanel.bindedValue = typeof(ProjectorData).GetProperty("targetFollowFlip");
+			togglePanels.Add(captureFollowFlipVPanel);
+
+			captureFollowFlipVPanel.tooltips = new string[]
+			{
+                ImmersiveProjector.ModTranslate("No", "Config."),
+                ImmersiveProjector.ModTranslate("Yes", "Config."),
+			};
+			page.Append(captureFollowFlipVPanel);
+
+			TogglePanel captureFollowRotationVPanel = new TogglePanel(2, toggleItemTexture, new Rectangle(0, 32 * 1, 32, 32), panelBackground);
+			captureFollowRotationVPanel.Width.Set(0, 0.5f);
+			captureFollowRotationVPanel.Left.Set(0, 0.5f);
+			captureFollowRotationVPanel.Top.Set(-(tabHeight[index] - 300), 1);
+			captureFollowRotationVPanel.Height.Set(40, 0);
+			captureFollowRotationVPanel.configName = ImmersiveProjector.ModTranslate("CaptureFollowRotation", "Config.");
+			captureFollowRotationVPanel.bindedValue = typeof(ProjectorData).GetProperty("targetFollowRotation");
+			togglePanels.Add(captureFollowRotationVPanel);
+
+			captureFollowRotationVPanel.tooltips = new string[]
+			{
+                ImmersiveProjector.ModTranslate("No", "Config."),
+                ImmersiveProjector.ModTranslate("Yes", "Config."),
+			};
+			page.Append(captureFollowRotationVPanel);
+
 			sep = new UIHorizontalSeparator();
 			sep.Width.Set(0, 1);
-			sep.Top.Set(-(tabHeight[index] - 310), 1);
+			sep.Top.Set(-(tabHeight[index] - 350), 1);
 			sep.Color = Color.White * 0.1f;
 			page.Append(sep);
 
@@ -662,7 +729,7 @@ namespace ImmersiveProjector.UI
 			ParallaxVPanel.bindedValue = typeof(ProjectorData).GetProperty("parallax");
 			sliderPanels.Add(ParallaxVPanel);
 			ParallaxVPanel.Width.Set(0, 1);
-			ParallaxVPanel.Top.Set(-(tabHeight[index] - 320), 1);
+			ParallaxVPanel.Top.Set(-(tabHeight[index] - 360), 1);
 			ParallaxVPanel.Height.Set(40, 0);
 			page.Append(ParallaxVPanel);
 		}

@@ -25,6 +25,8 @@ namespace ImmersiveProjector.DataStructure
         public WaterfallData[] waterfalls = null;
 
         public LightingEngine lightingEngine;
+        public Tuple<Rectangle, Vector3[]> referenceLightingCache;
+        public Tuple<Rectangle, Vector3[]> referenceLightingCacheSwap;
 
         public List<Dust> dustIdentities;
         // public List<Gore> goreIdentities;
@@ -36,6 +38,8 @@ namespace ImmersiveProjector.DataStructure
         public Vector2 cacheTopLeft;
         public Vector2 cacheBottomRight;
         public Vector2 cacheTargetOffset;
+        public bool cacheFollowFlipFlag;
+        public float cacheFollowRotation;
         public Vector2 cacheParallaxOffset;
         public bool cacheHitFlag;
         public bool cacheNeedDraw;
@@ -59,6 +63,8 @@ namespace ImmersiveProjector.DataStructure
             lightingEngine = new LightingEngine();
             lightingEngine.Rebuild();
             dustIdentities = new List<Dust>();
+            referenceLightingCache = new (new Rectangle(0, 0, 1, 1), new Vector3[1]);
+            referenceLightingCacheSwap = new (new Rectangle(0, 0, 1, 1), new Vector3[1]);
             // goreIdentities = new List<Gore>();
             this.tilePosition = tilePosition;
         }

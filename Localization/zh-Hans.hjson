@@ -48,6 +48,7 @@ Mods: {
 			FlipH: 左右镜像
 			FlipV: 上下镜像
 			DoubleClickResetPosition: 双击此处重置范围
+			DoubleClickResetScale: 重置当前缩放
 			TargetRotation: 旋转目标影像
 
 			CaptureTiles: 拍摄物块
@@ -75,7 +76,7 @@ Mods: {
 
 			CaptureLightingSources: 光源选择
 			CaptureLightingSourcesS: 原始区域
-			CaptureLightingSourcesT: 目标区域 (更快) 
+			CaptureLightingSourcesT: 目标区域 
 			CaptureLightingSourcesB: 二者之和
 
 			CapturePriority: 层叠优先级
@@ -90,6 +91,8 @@ Mods: {
 			CaptureParallax: 视差 
 			CaptureParallaxToolTip: 粉色视差线的长度比例
 
+			Yes: 是
+			No: 否
 			Red: 红
 			Green: 绿
 			Blue: 蓝
@@ -111,6 +114,8 @@ Mods: {
 			CaptureFollowSId: (对象下标)
 			CaptureFollowT: 投影区域跟踪
 			CaptureFollowTId: (对象下标)
+			CaptureFollowFlip: 同步翻转
+			CaptureFollowRotation: 同步旋转
 			CaptureFollowN: 不跟踪
 			CaptureFollowP: 玩家
 			CaptureFollowTN: 城镇NPC
