@@ -1,12 +1,10 @@
 ﻿using Terraria.DataStructures;
 using ImmersiveProjector.DataStructure;
-using Microsoft.Win32;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Reflection;
 using Terraria;
 using Terraria.GameContent;
@@ -20,7 +18,6 @@ using ImmersiveProjector.Tiles;
 using ReLogic.Content;
 using ImmersiveProjector.UI;
 using System.Collections;
-using System.Runtime.InteropServices;
 using System.Linq;
 using Steamworks;
 using Terraria.GameInput;
@@ -29,11 +26,10 @@ using Terraria.GameContent.Events;
 using System.Linq.Expressions;
 using Humanizer;
 using Terraria.IO;
-using System.Threading;
 using MonoMod.Cil;
 using Mono.Cecil.Cil;
 using Terraria.ID;
-using ReLogic.Threading;
+using static ImmersiveProjector.ProjectorUtils;
 
 namespace ImmersiveProjector
 {
@@ -42,6 +38,7 @@ namespace ImmersiveProjector
         public bool inited = false;
 
         public RenderTarget2D projectorRT = null;
+        public RenderTarget2D projectorRTSwap = null;
         public RenderTarget2D overlayRT = null;
 
 
@@ -106,9 +103,6 @@ namespace ImmersiveProjector
 
         public Action<SpriteBatch> delayedSpriteDraw;
 
-
-        private SpriteBatchHack spriteBatchHack = new SpriteBatchHack();
-
         public ProjectorSystem()
         {
         }
@@ -172,13 +166,18 @@ namespace ImmersiveProjector
             On.Terraria.Lighting.GetColor_int_int += LightColorDecorator;
             On.Terraria.Graphics.TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects += TileBatchDrawDecorator;
             On.Terraria.Graphics.TileBatch.InternalDraw += TileBatchInternalDrawDecorator;
-            On.Terraria.Main.DrawCachedNPCs += DrawCachedNPCsDecorator;
             On.Terraria.Lighting.Initialize += LightingInitializeDecorator;
             On.Terraria.Dust.NewDust += NewDustDecorator;
             On.Terraria.Gore.NewGore_IEntitySource_Vector2_Vector2_int_float += NewGoreDecorator;
             IL.Terraria.Dust.UpdateDust += UpdateDustILEdit;
+
+            On.Terraria.GameContent.Drawing.TileDrawing.PostDrawTiles += DrawHook_TileEntities;
+            On.Terraria.Main.DoDraw_UpdateCameraPosition += DrawHook_UpdateCameraPosition;
+            On.Terraria.Main.DrawCachedProjs += DrawHook_CachedProjs;
+            On.Terraria.Main.DrawCachedNPCs += DrawHook_CachedNPCs;
+            On.Terraria.Main.DrawCapture += DrawHook_Capture;
+
             legacyLightingRebuilt = false;
-            // var info = typeof(Main).GetProperty("tile", BindingFlags.Static | BindingFlags.Public);
             base.Load();
         }
 
@@ -186,6 +185,8 @@ namespace ImmersiveProjector
         {
             projectorRangeDisplayEffect = Mod.Assets.Request<Effect>("Effects/ProjectorRangeDisplay", AssetRequestMode.ImmediateLoad).Value;
             projectorFilterEffect = Mod.Assets.Request<Effect>("Effects/ProjectorFilter", AssetRequestMode.ImmediateLoad).Value;
+            ProjectorUtils.projectorRangeDisplayEffect = projectorRangeDisplayEffect;
+            ProjectorUtils.projectorFilterEffect = projectorFilterEffect;
             projectorLiquidRenderer = new LiquidRenderer();
             var info = typeof(LiquidRenderer).GetMethod("PrepareAssets", BindingFlags.Instance | BindingFlags.NonPublic);
             info.Invoke(projectorLiquidRenderer, new object[] { });
@@ -199,28 +200,29 @@ namespace ImmersiveProjector
             On.Terraria.Lighting.GetColor_int_int -= LightColorDecorator;
             On.Terraria.Graphics.TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects -= TileBatchDrawDecorator;
             On.Terraria.Graphics.TileBatch.InternalDraw -= TileBatchInternalDrawDecorator;
-            On.Terraria.Main.DrawCachedNPCs -= DrawCachedNPCsDecorator;
             On.Terraria.Lighting.Initialize -= LightingInitializeDecorator;
             On.Terraria.Dust.NewDust -= NewDustDecorator;
             On.Terraria.Gore.NewGore_IEntitySource_Vector2_Vector2_int_float -= NewGoreDecorator;
             IL.Terraria.Dust.UpdateDust -= UpdateDustILEdit;
+
+            On.Terraria.GameContent.Drawing.TileDrawing.PostDrawTiles -= DrawHook_TileEntities;
+            On.Terraria.Main.DoDraw_UpdateCameraPosition -= DrawHook_UpdateCameraPosition;
+            On.Terraria.Main.DrawCachedProjs -= DrawHook_CachedProjs;
+            On.Terraria.Main.DrawCachedNPCs -= DrawHook_CachedNPCs;
+            On.Terraria.Main.DrawCapture -= DrawHook_Capture;
+
             base.Unload();
         }
 
         public void EnsureProjectorRT(float width, float height)
         {
-            if (projectorRT == null || projectorRT.Width < width || projectorRT.Height < height)
-            {
-                if (projectorRT != null && !projectorRT.IsDisposed)
-                    projectorRT.Dispose();
-                projectorRT = new RenderTarget2D(Main.graphics.GraphicsDevice,
-                    Math.Max(projectorRT != null ? projectorRT.Width : 100, (int)Math.Ceiling(width)),
-                    Math.Max(projectorRT != null ? projectorRT.Height : 100, (int)Math.Ceiling(height)),
-                    false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.DiscardContents);
-            }
+            EnsureRT(width, height, ref projectorRT);
+            EnsureRT(width, height, ref projectorRTSwap);
         }
+
         public void EnsureOverlayRT(float width, float height)
         {
+            // This has to be with the same size
             if (overlayRT == null || overlayRT.Width != width || overlayRT.Height != height)
             {
                 if (overlayRT != null && !overlayRT.IsDisposed)
@@ -233,323 +235,89 @@ namespace ImmersiveProjector
             }
         }
 
-        public void QuickDrawBox(Vector2 position, Vector2 size, Color color)
+
+        private void DrawHook_Capture(On.Terraria.Main.orig_DrawCapture orig, Main self, Rectangle area, CaptureSettings settings)
         {
-            QuickDrawBoxLocal(position - Main.screenPosition, size, color);
+            var origScreenPosition = Main.screenPosition;
+            var origScreenWidth = Main.screenWidth;
+            var origScreenHeight = Main.screenHeight;
+
+            Main.screenPosition = area.TopLeft() * 16;
+            Main.screenWidth = area.Width * 16;
+            Main.screenHeight = area.Height * 16;
+
+            PrepareClippingCache();
+            orig(self, area, settings);
+
+            Main.screenPosition = origScreenPosition;
+            Main.screenWidth = origScreenWidth;
+            Main.screenHeight = origScreenHeight;
         }
 
-        public void QuickDrawBoxLocal(Vector2 position, Vector2 size, Color color)
+        private void DrawHook_UpdateCameraPosition(On.Terraria.Main.orig_DoDraw_UpdateCameraPosition orig)
         {
-            Rectangle simpleRect = new Rectangle(0, 0, 1, 1);
-            size.X = MathF.Max(0, size.X);
-            size.Y = MathF.Max(0, size.Y);
-            Vector2 UnitX = Vector2.UnitX * size / 16f;
-            Vector2 UnitY = Vector2.UnitY * size / 16f;
-            Vector2 SX = UnitX + Vector2.UnitY;
-            Vector2 SY = UnitY + Vector2.UnitX;
-
-            SpriteBatch spriteBatch = Main.spriteBatch;
-            spriteBatch.Draw(TextureAssets.MagicPixel.Value, position + Vector2.UnitX * -2f, simpleRect, color, 0f, Vector2.Zero, new Vector2(2f, 16f) * SY, SpriteEffects.None, 0f);
-            spriteBatch.Draw(TextureAssets.MagicPixel.Value, position + UnitX * 16f, simpleRect, color, 0f, Vector2.Zero, new Vector2(2f, 16f) * SY, SpriteEffects.None, 0f);
-            spriteBatch.Draw(TextureAssets.MagicPixel.Value, position + Vector2.UnitY * -2f, simpleRect, color, 0f, Vector2.Zero, new Vector2(16f, 2f) * SX, SpriteEffects.None, 0f);
-            spriteBatch.Draw(TextureAssets.MagicPixel.Value, position + UnitY * 16f, simpleRect, color, 0f, Vector2.Zero, new Vector2(16f, 2f) * SX, SpriteEffects.None, 0f);
+            orig();
         }
 
-        public void QuickDrawLineLocal(Vector2 from, Vector2 to, Color color)
+        private void DrawHook_TileEntities(On.Terraria.GameContent.Drawing.TileDrawing.orig_PostDrawTiles orig, TileDrawing self, bool solidLayer, bool forRenderTargets, bool intoRenderTargets)
         {
-            SpriteBatch spriteBatch = Main.spriteBatch;
-            Rectangle simpleRect = new Rectangle(
-                0 + (int)(512 * (Main.timeForVisualEffects * 0.01 - Math.Floor(Main.timeForVisualEffects * 0.01))) % 512,
-                0,
-                (int)((to - from).Length() * 2),
-                2
-            );
-            spriteBatch.Draw(TextureAssets.MagicPixel.Value, to, simpleRect, color * 0.5f, MathF.Atan2(-to.Y + from.Y, -to.X + from.X),
-                Vector2.UnitY * 0.5f, new Vector2(1 / 2f, 1f), SpriteEffects.None, 0f);
-            spriteBatch.Draw(TextureAssets.Extra[178].Value, to, simpleRect, color * 0.5f, MathF.Atan2(-to.Y + from.Y, -to.X + from.X),
-                Vector2.UnitY * 0.5f, new Vector2(1 / 2f, 3f), SpriteEffects.None, 0f);
+            orig(self, solidLayer, forRenderTargets, intoRenderTargets);
         }
 
-        public void QuickDrawLine(Vector2 from, Vector2 to, Color color)
+        private void DrawHook_CachedProjs(On.Terraria.Main.orig_DrawCachedProjs orig, Main self, List<int> projCache, bool startSpriteBatch)
         {
-            QuickDrawLineLocal(from - Main.screenPosition, to - Main.screenPosition, color);
-            if (from != to && false)
+            if (projCache == Main.instance.DrawCacheProjsOverWiresUI)
             {
-                Vector2 dir = Vector2.Normalize(to - from) * 10;
-                QuickDrawLineLocal(to - dir.RotatedBy(MathF.PI / 10) - Main.screenPosition, to - Main.screenPosition, color);
-                QuickDrawLineLocal(to - dir.RotatedBy(-MathF.PI / 10) - Main.screenPosition, to - Main.screenPosition, color);
+                if (startSpriteBatch)
+                    Main.spriteBatch.Begin();
+                DrawProjectorLayer((int)ProjectorData.LayerFlag.Foreground);
+                if (startSpriteBatch)
+                    Main.spriteBatch.End();
             }
-        }
-        public void QuickDashLineLocal(Vector2 from, Vector2 to, Color color)
-        {
-            if (from == to)
-                return;
-            float step = 8f / (from - to).Length();
-            float t = (float)Main.timeForVisualEffects * 0.02f;
-            for (float v = (t - MathF.Floor(t) - 1) * 2 * step; v < 1; v += 2 * step)
-                QuickDrawLineLocal(from * (1 - Utils.Clamp(v, 0, 1)) + to * Utils.Clamp(v, 0, 1), from * (1 - Utils.Clamp(v + step, 0, 1)) + to * Utils.Clamp(v + step, 0, 1), color);
-        }
-
-        public void QuickDrawBezier(Vector2 from, Vector2 to, Vector2 control, Color color, int steps = 10)
-        {
-            Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, RasterizerState.CullNone, null, Matrix.Identity);
-            List<SimpleVertexInfo> vertex = new List<SimpleVertexInfo>();
-
-            projectorRangeDisplayEffect.Parameters["uMVP"].SetValue(CreateMVP(Vector2.Zero));
-            for (int i = 0; i < steps; i++)
+            if (projCache == Main.instance.DrawCacheProjsBehindNPCs)
             {
-                float t = i / (float)steps;
-                Vector2 p = (1 - t) * (1 - t) * from + 2 * t * (1 - t) * control + t * t * to;
-                float u = (i + 1) / (float)steps;
-                Vector2 q = (1 - u) * (1 - u) * from + 2 * u * (1 - u) * control + u * u * to;
-
-                Vector2 dir = (q - p).SafeNormalize(Vector2.UnitX);
-                Vector2 norm = new Vector2(-dir.Y, dir.X);
-
-                vertex.Add(new SimpleVertexInfo(new Vector3(p.X - norm.X, -p.Y + norm.Y, 0) * Main.GameViewMatrix.Zoom.X, new Vector2(t, 0)));
-                vertex.Add(new SimpleVertexInfo(new Vector3(p.X + norm.X, -p.Y - norm.Y, 0) * Main.GameViewMatrix.Zoom.X, new Vector2(t, 1)));
-                vertex.Add(new SimpleVertexInfo(new Vector3(q.X - norm.X, -q.Y + norm.Y, 0) * Main.GameViewMatrix.Zoom.X, new Vector2(t, 0)));
-                vertex.Add(new SimpleVertexInfo(new Vector3(q.X + norm.X, -q.Y - norm.Y, 0) * Main.GameViewMatrix.Zoom.X, new Vector2(t, 1)));
+                if (startSpriteBatch)
+                    Main.spriteBatch.Begin();
+                DrawProjectorLayer((int)ProjectorData.LayerFlag.Normal);
+                if (startSpriteBatch)
+                    Main.spriteBatch.End();
             }
-            projectorRangeDisplayEffect.Parameters["uTex"].SetValue(TextureAssets.MagicPixel.Value);
-            projectorRangeDisplayEffect.Parameters["uColor"].SetValue(color.ToVector4());
-            projectorRangeDisplayEffect.CurrentTechnique.Passes["Simple"].Apply();
-            if (vertex.Count > 3)
-                Main.graphics.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, vertex.ToArray(), 0, vertex.Count - 2);
-            Main.spriteBatch.End();
+            orig(self, projCache, startSpriteBatch);
         }
 
-        public bool CalculateClippedArea(ProjectorInstance structure, out bool hitFlag, out Vector2 targetTopLeft, out Vector2 targetBottomRight, out Vector2 targetFollowOffset)
+        private void DrawHook_CachedNPCs(On.Terraria.Main.orig_DrawCachedNPCs orig, Main self, List<int> npcCache, bool behindTiles)
         {
-            var anchorOffset = structure.data.targetPoint - structure.tilePosition.ToWorldCoordinates();
-            var targetSize = structure.data.targetSize;
-            bool flipFlag = false;
-            float followRotation = 0;
-            targetFollowOffset = Vector2.Zero;
-
-            structure.cacheTargetOffset = Vector2.Zero;
-            structure.cacheParallaxOffset = Vector2.Zero;
-            structure.cacheFollowFlipFlag = false;
-            structure.cacheFollowRotation = 0;
-            switch (structure.data.targetFollow)
+            if (npcCache == Main.instance.DrawCacheNPCsMoonMoon)
+                DrawProjectorLayer((int)ProjectorData.LayerFlag.BehindWalls);
+            if (npcCache == Main.instance.DrawCacheNPCsBehindNonSolidTiles)
             {
-                case (int)ProjectorData.FollowingFlag.Player:
-                    for (var i = 0; i < Main.player.Length; i++)
+                DrawProjectorLayer((int)ProjectorData.LayerFlag.BehindFurnitures);
+            }
+            orig(self, npcCache, behindTiles);
+        }
+
+        public void PrepareClippingCache()
+        {
+            lock (projectorList)
+            {
+                foreach (var s in projectorList)
+                {
+                    TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
+                    if (te != null && te is ProjectorTileEntity entity)
                     {
-                        var player = Main.player[(i + (int)(structure.data.targetFollowId * Main.player.Length)) % Main.npc.Length];
-                        if (player.active)
+                        if (entity.projectorInstance != s)
+                            continue;
+                        if (entity.TurnedOn && CalculateClippedArea(s, out var hitFlag, out var tl, out var br, out var to))
                         {
-                            targetFollowOffset = -structure.data.targetPoint + player.Center;
-                            targetFollowOffset += anchorOffset;
-                            flipFlag = player.direction > 0;
-                            followRotation = player.fullRotation;
-                            break;
+                            s.cacheHitFlag = hitFlag;
+                            s.cacheTopLeft = tl;
+                            s.cacheBottomRight = br;
+                            s.cacheTargetOffset = to;
+                            s.cacheNeedDraw = true;
                         }
                     }
-                    break;
-                case (int)ProjectorData.FollowingFlag.Boss:
-                    for (var i = 0; i < Main.npc.Length; i++)
-                    {
-                        var npc = Main.npc[(i + (int)(structure.data.targetFollowId * Main.npc.Length)) % Main.npc.Length];
-                        if (npc.active && npc.boss)
-                        {
-                            targetFollowOffset = -structure.data.targetPoint + npc.Center;
-                            targetFollowOffset += anchorOffset;
-                            flipFlag = npc.direction > 0;
-                            followRotation = npc.rotation;
-                            break;
-                        }
-                    }
-                    break;
-                case (int)ProjectorData.FollowingFlag.TownNPC:
-                    for (var i = 0; i < Main.npc.Length; i++)
-                    {
-                        var npc = Main.npc[(i + (int)(structure.data.targetFollowId * Main.npc.Length)) % Main.npc.Length];
-                        if (npc.active && npc.townNPC)
-                        {
-                            targetFollowOffset = -structure.data.targetPoint + npc.Center;
-                            targetFollowOffset += anchorOffset;
-                            flipFlag = npc.direction > 0;
-                            followRotation = npc.rotation;
-                            break;
-                        }
-                    }
-                    break;
+                }
             }
-            if (structure.data.targetFollowFlip == 0)
-                flipFlag = false;
-            followRotation *= 180f / MathF.PI;
-            structure.data.targetPoint += targetFollowOffset;
-            Vector2 parallaxOffset = ((CaptureManager.Instance.IsCapturing ? Main.LocalPlayer.Center : Main.Camera.Center)
-                                   - (structure.tilePosition.ToWorldCoordinates())) * structure.data.parallax;
-            structure.data.targetPoint += parallaxOffset;
-            float targetRotation = structure.data.targetRotation + followRotation;
-
-            Vector2 targetBoundingR = targetSize.RotatedBy(targetRotation / 180f * MathF.PI) * 0.5f;
-            targetBoundingR.X = MathF.Abs(targetBoundingR.X);
-            targetBoundingR.Y = MathF.Abs(targetBoundingR.Y);
-            Vector2 targetBoundingR2 = (targetSize * new Vector2(-1, 1)).RotatedBy(targetRotation / 180f * MathF.PI) * 0.5f;
-            targetBoundingR2.X = MathF.Abs(targetBoundingR2.X);
-            targetBoundingR2.Y = MathF.Abs(targetBoundingR2.Y);
-            targetBoundingR.X = MathF.Max(targetBoundingR.X, targetBoundingR2.X);
-            targetBoundingR.Y = MathF.Max(targetBoundingR.Y, targetBoundingR2.Y);
-            Vector2 targetBoundTopLeft = structure.data.targetPoint - targetBoundingR;
-            Vector2 targetBoundBottomRight = structure.data.targetPoint + targetBoundingR;
-
-            // Target out of screen
-            if ((uiSystem.projectorUIState.focusedInstance != structure || uiSystem.userInterface.CurrentState != uiSystem.projectorUIState) &&
-                (targetBoundTopLeft.X > Main.screenPosition.X + Main.screenWidth || targetBoundBottomRight.X < Main.screenPosition.X ||
-                 targetBoundTopLeft.Y > Main.screenPosition.Y + Main.screenHeight || targetBoundBottomRight.Y < Main.screenPosition.Y))
-            {
-                structure.data.targetPoint -= targetFollowOffset + parallaxOffset;
-                hitFlag = false;
-                targetTopLeft = targetBottomRight = Vector2.Zero;
-                return false;
-            }
-
-            hitFlag = (targetBoundTopLeft.X < Main.LocalPlayer.position.X + Main.LocalPlayer.width && targetBoundBottomRight.X > Main.LocalPlayer.position.X
-                    && targetBoundTopLeft.Y < Main.LocalPlayer.position.Y + Main.LocalPlayer.height && targetBoundBottomRight.Y > Main.LocalPlayer.position.Y);
-
-            Vector2 clipTL = Main.Camera.ScaledPosition - Vector2.One * 4;
-            Vector2 clipBR = Main.Camera.ScaledPosition + Main.Camera.ScaledSize + Vector2.One * 4;
-
-            targetBoundTopLeft = new Vector2
-            (
-                MathF.Max(targetBoundTopLeft.X, clipTL.X),
-                MathF.Max(targetBoundTopLeft.Y, clipTL.Y)
-            );
-
-            targetBoundBottomRight = new Vector2
-            (
-                MathF.Min(targetBoundBottomRight.X, clipBR.X),
-                MathF.Min(targetBoundBottomRight.Y, clipBR.Y)
-            );
-
-            if (targetBoundTopLeft.X > targetBoundBottomRight.X || targetBoundTopLeft.Y > targetBoundBottomRight.Y)
-            {
-                structure.data.targetPoint -= targetFollowOffset + parallaxOffset;
-                hitFlag = false;
-                targetTopLeft = targetBottomRight = Vector2.Zero;
-                return false;
-            }
-
-            Vector2 targetBoundingT1 = (targetBoundTopLeft - structure.data.targetPoint).RotatedBy(-targetRotation / 180f * MathF.PI);
-            Vector2 targetBoundingT2 = (new Vector2(targetBoundTopLeft.X, targetBoundBottomRight.Y) - structure.data.targetPoint).RotatedBy(-targetRotation / 180f * MathF.PI);
-            Vector2 targetBoundingT3 = (targetBoundBottomRight - structure.data.targetPoint).RotatedBy(-targetRotation / 180f * MathF.PI);
-            Vector2 targetBoundingT4 = (new Vector2(targetBoundBottomRight.X, targetBoundTopLeft.Y) - structure.data.targetPoint).RotatedBy(-targetRotation / 180f * MathF.PI);
-
-            if ((structure.data.targetFlip == (int)ProjectorData.FlipFlag.Horizontal) != flipFlag)
-            {
-                targetBoundingT1.X *= -1;
-                targetBoundingT2.X *= -1;
-                targetBoundingT3.X *= -1;
-                targetBoundingT4.X *= -1;
-            }
-            if (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Vertical)
-            {
-                targetBoundingT1.Y *= -1;
-                targetBoundingT2.Y *= -1;
-                targetBoundingT3.Y *= -1;
-                targetBoundingT4.Y *= -1;
-            }
-
-            var expandTargetBoundTopLeft = new Vector2
-            (
-                MathF.Min(MathF.Min(targetBoundingT1.X, targetBoundingT2.X), MathF.Min(targetBoundingT3.X, targetBoundingT4.X)),
-                MathF.Min(MathF.Min(targetBoundingT1.Y, targetBoundingT2.Y), MathF.Min(targetBoundingT3.Y, targetBoundingT4.Y))
-            ) + structure.data.targetPoint;
-
-            var expandTargetBoundBottomRight = new Vector2
-            (
-                MathF.Max(MathF.Max(targetBoundingT1.X, targetBoundingT2.X), MathF.Max(targetBoundingT3.X, targetBoundingT4.X)),
-                MathF.Max(MathF.Max(targetBoundingT1.Y, targetBoundingT2.Y), MathF.Max(targetBoundingT3.Y, targetBoundingT4.Y))
-            ) + structure.data.targetPoint;
-
-            targetTopLeft = new Vector2
-            (
-                MathF.Max(expandTargetBoundTopLeft.X, structure.data.targetTopLeft.X),
-                MathF.Max(expandTargetBoundTopLeft.Y, structure.data.targetTopLeft.Y)
-            );
-
-            targetBottomRight = new Vector2
-            (
-                MathF.Min(expandTargetBoundBottomRight.X, structure.data.targetBottomRight.X),
-                MathF.Min(expandTargetBoundBottomRight.Y, structure.data.targetBottomRight.Y)
-            );
-
-            bool expandFlag = (structure.data.targetScale >= 1.0f);
-            float align = expandFlag ?
-                1 * structure.data.targetScale : // 1 pixel in source rect
-                2; // 2 pixels in target rect
-            targetTopLeft = (targetTopLeft - structure.data.targetTopLeft) / align;
-            targetTopLeft = new Vector2(MathF.Floor(targetTopLeft.X), MathF.Floor(targetTopLeft.Y)) * align + structure.data.targetTopLeft;
-
-            targetSize = targetBottomRight - targetTopLeft;
-            structure.cacheParallaxOffset = parallaxOffset;
-            structure.data.targetPoint -= targetFollowOffset + parallaxOffset;
-
-            if (targetSize.X <= 0 || targetSize.Y <= 0)
-                return false;
-            if (structure.data.targetFollowFlip > 0)
-                structure.cacheFollowFlipFlag = flipFlag;
-            if (structure.data.targetFollowRotation > 0)
-                structure.cacheFollowRotation = followRotation;
-            return true;
-        }
-
-        public void CalculateSourceAreaFromCache(ProjectorInstance structure, out Vector2 sourceTopLeft, out Vector2 sourceBottomRight, out Vector2 sourceFollowOffset)
-        {
-            var anchorOffset = structure.data.sourcePoint - structure.tilePosition.ToWorldCoordinates();
-            var targetTopLeft = structure.cacheTopLeft;
-            var targetBottomRight = structure.cacheBottomRight;
-            sourceTopLeft = (targetTopLeft - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
-            sourceBottomRight = (targetBottomRight - structure.data.targetPoint) / structure.data.targetScale + structure.data.sourcePoint;
-            sourceFollowOffset = Vector2.Zero;
-
-            switch (structure.data.sourceFollow)
-            {
-                case (int)ProjectorData.FollowingFlag.Player:
-                    for (var i = 0; i < Main.player.Length; i++)
-                    {
-                        var player = Main.player[(i + (int)(structure.data.sourceFollowId * Main.player.Length)) % Main.npc.Length];
-                        if (player.active)
-                        {
-                            sourceFollowOffset = -structure.data.sourcePoint + player.Center;
-                            sourceFollowOffset += anchorOffset;
-                            break;
-                        }
-                    }
-                    break;
-                case (int)ProjectorData.FollowingFlag.Boss:
-                    for (var i = 0; i < Main.npc.Length; i++)
-                    {
-                        var npc = Main.npc[(i + (int)(structure.data.sourceFollowId * Main.npc.Length)) % Main.npc.Length];
-                        if (npc.active && npc.boss)
-                        {
-                            sourceFollowOffset = -structure.data.sourcePoint + npc.Center;
-                            sourceFollowOffset += anchorOffset;
-                            break;
-                        }
-                    }
-                    break;
-                case (int)ProjectorData.FollowingFlag.TownNPC:
-                    for (var i = 0; i < Main.npc.Length; i++)
-                    {
-                        var npc = Main.npc[(i + (int)(structure.data.sourceFollowId * Main.npc.Length)) % Main.npc.Length];
-                        if (npc.active && npc.townNPC)
-                        {
-                            sourceFollowOffset = -structure.data.sourcePoint + npc.Center;
-                            sourceFollowOffset += anchorOffset;
-                            break;
-                        }
-                    }
-                    break;
-            }
-            structure.cacheSourceOffset = sourceFollowOffset;
-            sourceTopLeft += sourceFollowOffset;
-            sourceBottomRight += sourceFollowOffset;
-            structure.cacheSourceTopLeft = sourceTopLeft;
-            structure.cacheSourceBottomRight = sourceBottomRight;
         }
 
         public void HookedDraw(ProjectorInstance structure)
@@ -613,16 +381,10 @@ namespace ImmersiveProjector
             FieldInfo _activeEngineInfo = typeof(Lighting).GetField("_activeEngine", BindingFlags.Static | BindingFlags.NonPublic);
             ILightingEngine origActiveEngine = (ILightingEngine)_activeEngineInfo.GetValue(null);
             origLightingEngineCache = origActiveEngine;
-            lightingCombination = (ProjectorData.LightingSourceFlag)structure.data.lightingSource;
-            referenceLightingCache = structure.referenceLightingCache;
 
             var origLiquidRenderer = LiquidRenderer.Instance;
             LiquidRenderer.Instance = projectorLiquidRenderer;
             projectorLiquidRenderer._liquidTextures = origLiquidRenderer._liquidTextures;
-
-            GraphicsDevice graphicDevice = Main.graphics.GraphicsDevice;
-
-            // Lighting.Mode = LightMode.Color;
 
             Rectangle lightingArea = new Rectangle(Math.Max(5, (int)(sourceTopLeft.X / 16)), Math.Max(5, (int)(sourceTopLeft.Y / 16)),
                                                    (int)(sourceSize.X / 16) + 1, (int)(sourceSize.Y / 16) + 1);
@@ -631,110 +393,13 @@ namespace ImmersiveProjector
                                                  Math.Min(Main.maxTilesY - 5 - lightingArea.Y, lightingArea.Height + 6) + 4);
             // These magical numbers cannot be changed for some reason
 
+            GraphicsDevice graphicDevice = Main.graphics.GraphicsDevice;
+
             var projectorLightingEngine = structure.lightingEngine;
-            ILightingEngine currentEngine = origLightingMode == LightMode.Color ? projectorLightingEngine : projectorLegacyLighting;
+            ILightingEngine currentEngine = (origLightingMode == LightMode.Color || origLightingMode == LightMode.White) ? projectorLightingEngine : projectorLegacyLighting;
             projectorLegacyLighting.Mode = Lighting.LegacyEngine.Mode;
-
             _activeEngineInfo.SetValue(null, currentEngine);
-            Main.mapDelay = 99;
-            Main.mapTime = 99;
-
-            structure.updateCounter += MathF.Pow(structure.data.lightFreq, 2);
-            if (structure.updateCounter >= 1)
-            {
-                structure.updateCounter -= 1 + Main.rand.NextFloat() * (1 - structure.data.lightFreq);
-                if (currentEngine == projectorLegacyLighting)
-                {
-                    // Legacy engine will call PreRenderPass when renderCount > RenderPhases
-                    // So we set renderCount to a large number to initialize current area
-                    Main.renderCount = 99;
-                    // Legacy engine will try to reuse data based on screenLastPosition to reduce calculation.
-                    // we set screenLastPosition to current position to prevent this behavior (which causes glitches)
-                    Main.screenLastPosition = Main.screenPosition;
-
-                    // Actually only 3 phase is funcional in legacy lighting
-                    // phase 1 and 2 are for usual lighting
-                    // phase 3 is for map update
-                    // phase {RenderPhases} is for PreRenderPass
-                    // there is no phase 0 (it only occurs when PrePenderPass is called)
-                    // Therefore, we need to start with PreRenderPass
-                    // and execute the following 2 phases.
-                    if (legacyLightingRebuilt)
-                    {
-                        for (int i = 0; i < 1 + 2; i++)
-                        {
-                            currentEngine.ProcessArea(lightingArea);
-                        }
-                    }
-                    else
-                    {
-                        // This rebuild is to prevent IndexOutOfRange error 
-                        // when first enter world
-                        currentEngine.Rebuild();
-                        legacyLightingRebuilt = true;
-                    }
-                }
-                else
-                {
-                    WritePerframeLightsTo(projectorLightingEngine);
-                    // add a random offset to make updates out of sync
-                    // and prevent flooding at some point
-                    var stateInfo = typeof(LightingEngine).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
-                    // SavePerframeLightsFrom(projectorLightingEngine);
-                    // The first 2 states are
-                    // EngineState.MinimapUpdate and EngineState.ExportMetrics
-                    // we only use lighting engine to obtain lighting data
-                    // stateInfo.SetValue(projectorLightingEngine, 2);
-                    int newPadding = 23;
-                    Rectangle uninflate = lightingArea;
-                    uninflate.Inflate(newPadding - 28, newPadding - 28);
-                    if (!CaptureManager.Instance.IsCapturing)
-                    {
-                        if ((int)stateInfo.GetValue(projectorLightingEngine) >= 2)
-                        {
-                            // Finish the last 2 states (Scan and Blur)
-                            currentEngine.ProcessArea(uninflate);
-                        }
-                        else
-                            stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
-                    }
-                    else
-                    {
-                        stateInfo.SetValue(projectorLightingEngine, 2);
-                        for (int i = 0; i < 2; i++)
-                            currentEngine.ProcessArea(uninflate);
-                    }
-                }
-                if (structure.data.lightingSource != (int)ProjectorData.LightingSourceFlag.Source)
-                {
-                    if (structure.referenceLightingCacheSwap.Item2.Length < (lightingArea.Width + 2) * (lightingArea.Height + 2))
-                        structure.referenceLightingCacheSwap = new Tuple<Rectangle, Vector3[]>(
-                            new Rectangle(lightingArea.X - 1, lightingArea.Y - 1, lightingArea.Width + 2, lightingArea.Height + 2),
-                            new Vector3[(lightingArea.Width + 2) * (lightingArea.Height + 2)]);
-                    else
-                        structure.referenceLightingCacheSwap = new Tuple<Rectangle, Vector3[]>(
-                            new Rectangle(lightingArea.X - 1, lightingArea.Y - 1, lightingArea.Width + 2, lightingArea.Height + 2),
-                            structure.referenceLightingCacheSwap.Item2);
-                    bool flipX = (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Horizontal) != structure.cacheFollowFlipFlag;
-                    bool flipY = (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Vertical);
-                    var tuple = structure.referenceLightingCacheSwap as Tuple<Rectangle, Vector3[]>;
-                    for (int i = lightingArea.X - 1; i < lightingArea.X + lightingArea.Width + 1; i++)
-                        for (int j = lightingArea.Y - 1; j < lightingArea.Y + lightingArea.Height + 1; j++)
-                        {
-                            Vector2 referencePosition = (((new Vector2(i * 16 + 8, j * 16 + 8) - structure.data.sourcePoint)
-                                                        * new Vector2(flipX ? -1 : 1, flipY ? -1 : 1))
-                                                        .RotatedBy(structure.data.targetRotation * MathF.PI / 180f)
-                                                        * structure.data.targetScale
-                                                        + structure.data.targetPoint) / 16f;
-                            tuple.Item2
-                            [
-                                (i - tuple.Item1.Left) * tuple.Item1.Height +
-                                 j - tuple.Item1.Top
-                            ] = origLightingEngineCache.GetColor((int)referencePosition.X, (int)referencePosition.Y) * Lighting.GlobalBrightness;
-                        }
-                    Utils.Swap(ref structure.referenceLightingCache, ref structure.referenceLightingCacheSwap);
-                }
-            }
+            HookedDraw_UpdateLighting(structure, currentEngine, lightingArea);
 
             if (expandFlag)
                 EnsureProjectorRT(sourceSize.X, sourceSize.Y);
@@ -926,14 +591,6 @@ namespace ImmersiveProjector
                 Main.screenPosition = sourceTopLeft;
             }
 
-            // Restore state of special points
-            /*
-            _specialTilesCountInfo.SetValue(tileDrawing, specialTilesCount);
-            for (var i = 0; i < specialsCount.Length; i++)
-                if (_specialsCount[i] != specialsCount[i])
-                    _specialsCount[i] = specialsCount[i];
-            */
-
             // Tiles part 2
             if (structure.data.captureSolid != (int)ProjectorData.CaptureSolidFlag.None)
             {
@@ -1073,15 +730,6 @@ namespace ImmersiveProjector
                 Main.screenPosition = sourceTopLeft;
             }
 
-            // Restore state of special points
-            /*
-            _specialTilesCountInfo.SetValue(tileDrawing, specialTilesCount);
-            for (var i = 0; i < specialsCount.Length; i++)
-                if (_specialsCount[i] != specialsCount[i])
-                    _specialsCount[i] = specialsCount[i];
-            */
-
-            // void Draw(bool solidLayer, bool forRenderTargets, bool intoRenderTargets, int waterStyleOverride = -1)
 
             Main.drawToScreen = origDrawToScreen;
             Main.screenPosition = origScreenPosition;
@@ -1131,7 +779,6 @@ namespace ImmersiveProjector
                         if (!Main.tile[referencePoint].HasTile && Main.tile[referencePoint].WallType == 0)
                             hitFlag = false;
                     }
-
                     /*
                     referencePoint.X = Utils.Clamp(referencePoint.X, 0, projectorRT.Width - 1);
                     referencePoint.Y = Utils.Clamp(referencePoint.Y, 0, projectorRT.Height - 1);
@@ -1150,6 +797,8 @@ namespace ImmersiveProjector
             }
             else
                 structure.fadingValue = 0;
+
+            HookedDraw_PostProcessing(structure, expandFlag ? sourceSize : targetSize);
 
             Main.graphics.GraphicsDevice.SetRenderTargets(origTargets);
             Main.spriteBatch.Begin(SpriteSortMode.Immediate, structure.data.blending == (int)ProjectorData.BlendingFlag.Additive ? BlendState.Additive : BlendState.AlphaBlend,
@@ -1224,6 +873,142 @@ namespace ImmersiveProjector
             structure.data.targetPoint -= targetFollowOffset;
             structure.data.targetPoint -= structure.cacheParallaxOffset;
             structure.data.targetRotation -= structure.cacheFollowRotation;
+        }
+
+        public void HookedDraw_UpdateLighting(ProjectorInstance structure, ILightingEngine currentEngine, Rectangle lightingArea)
+        {
+            lightingCombination = (ProjectorData.LightingSourceFlag)structure.data.lightingSource;
+            referenceLightingCache = structure.referenceLightingCache;
+
+            Main.mapDelay = 99;
+            Main.mapTime = 99;
+
+            structure.updateCounter += MathF.Pow(structure.data.lightFreq, 2);
+            if (structure.updateCounter >= 1 || CaptureManager.Instance.IsCapturing)
+            {
+                if (!CaptureManager.Instance.IsCapturing)
+                    structure.updateCounter -= 1 + Main.rand.NextFloat() * (1 - structure.data.lightFreq);
+                if (currentEngine == projectorLegacyLighting)
+                {
+                    // Legacy engine will call PreRenderPass when renderCount > RenderPhases
+                    // So we set renderCount to a large number to initialize current area
+                    Main.renderCount = 99;
+                    // Legacy engine will try to reuse data based on screenLastPosition to reduce calculation.
+                    // we set screenLastPosition to current position to prevent this behavior (which causes glitches)
+                    Main.screenLastPosition = Main.screenPosition;
+
+                    // Actually only 3 phase is funcional in legacy lighting
+                    // phase 1 and 2 are for usual lighting
+                    // phase 3 is for map update
+                    // phase {RenderPhases} is for PreRenderPass
+                    // there is no phase 0 (it only occurs when PrePenderPass is called)
+                    // Therefore, we need to start with PreRenderPass
+                    // and execute the following 2 phases.
+                    if (legacyLightingRebuilt)
+                    {
+                        for (int i = 0; i < 1 + 2; i++)
+                        {
+                            currentEngine.ProcessArea(lightingArea);
+                        }
+                    }
+                    else
+                    {
+                        // This rebuild is to prevent IndexOutOfRange error 
+                        // when first enter world
+                        currentEngine.Rebuild();
+                        legacyLightingRebuilt = true;
+                    }
+                }
+                else if (currentEngine is LightingEngine projectorLightingEngine)
+                {
+                    WritePerframeLightsTo(projectorLightingEngine);
+                    // add a random offset to make updates out of sync
+                    // and prevent flooding at some point
+                    var stateInfo = typeof(LightingEngine).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
+                    // SavePerframeLightsFrom(projectorLightingEngine);
+                    // The first 2 states are
+                    // EngineState.MinimapUpdate and EngineState.ExportMetrics
+                    // we only use lighting engine to obtain lighting data
+                    // stateInfo.SetValue(projectorLightingEngine, 2);
+                    int newPadding = 23;
+                    Rectangle uninflate = lightingArea;
+                    uninflate.Inflate(newPadding - 28, newPadding - 28);
+                    if (!CaptureManager.Instance.IsCapturing)
+                    {
+                        if ((int)stateInfo.GetValue(projectorLightingEngine) >= 2)
+                        {
+                            // Finish the last 2 states (Scan and Blur)
+                            currentEngine.ProcessArea(uninflate);
+                        }
+                        else
+                            stateInfo.SetValue(projectorLightingEngine, ((int)stateInfo.GetValue(projectorLightingEngine) + 1) % 4);
+                    }
+                    else // if (structure.data.lightingSource != (int)ProjectorData.LightingSourceFlag.Target)
+                    {
+                        stateInfo.SetValue(projectorLightingEngine, 2);
+                        for (int i = 0; i < 2; i++)
+                            currentEngine.ProcessArea(uninflate);
+                    }
+                }
+                if (structure.data.lightingSource != (int)ProjectorData.LightingSourceFlag.Source)
+                {
+                    lightingArea.Inflate(10, 10);
+                    if (structure.referenceLightingCacheSwap.Item2.Length < (lightingArea.Width + 2) * (lightingArea.Height + 2))
+                        structure.referenceLightingCacheSwap = new Tuple<Rectangle, Vector3[]>(
+                            new Rectangle(lightingArea.X - 1, lightingArea.Y - 1, lightingArea.Width + 2, lightingArea.Height + 2),
+                            new Vector3[(lightingArea.Width + 2) * (lightingArea.Height + 2)]);
+                    else
+                        structure.referenceLightingCacheSwap = new Tuple<Rectangle, Vector3[]>(
+                            new Rectangle(lightingArea.X - 1, lightingArea.Y - 1, lightingArea.Width + 2, lightingArea.Height + 2),
+                            structure.referenceLightingCacheSwap.Item2);
+                    bool flipX = (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Horizontal) != structure.cacheFollowFlipFlag;
+                    bool flipY = (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Vertical);
+                    var tuple = structure.referenceLightingCacheSwap as Tuple<Rectangle, Vector3[]>;
+                    for (int i = lightingArea.X - 1; i < lightingArea.X + lightingArea.Width + 1; i++)
+                        for (int j = lightingArea.Y - 1; j < lightingArea.Y + lightingArea.Height + 1; j++)
+                        {
+                            Vector2 referencePosition = (((new Vector2(i * 16 + 8, j * 16 + 8) - structure.data.sourcePoint)
+                                                        * new Vector2(flipX ? -1 : 1, flipY ? -1 : 1))
+                                                        .RotatedBy(structure.data.targetRotation * MathF.PI / 180f)
+                                                        * structure.data.targetScale
+                                                        + structure.data.targetPoint) / 16f;
+                            tuple.Item2
+                            [
+                                (i - tuple.Item1.Left) * tuple.Item1.Height +
+                                 j - tuple.Item1.Top
+                            ] = origLightingEngineCache.GetColor((int)referencePosition.X, (int)referencePosition.Y) * Lighting.GlobalBrightness;
+                        }
+                    Utils.Swap(ref structure.referenceLightingCache, ref structure.referenceLightingCacheSwap);
+                    referenceLightingCache = structure.referenceLightingCache;
+                }
+            }
+        }
+
+        public void HookedDraw_PostProcessing(ProjectorInstance structure, Vector2 size)
+        {
+            if (structure.data.filter == (int)ProjectorData.FilterFlag.Border)
+            {
+                Utils.Swap(ref projectorRT, ref projectorRTSwap);
+                Main.graphics.GraphicsDevice.SetRenderTargets(projectorRT);
+                Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque, SamplerState.PointClamp, DepthStencilState.None, Main.Rasterizer, null, Matrix.Identity);
+                projectorFilterEffect.Parameters["uStep"].SetValue(Vector2.One / size);
+                projectorFilterEffect.CurrentTechnique.Passes["Border"].Apply();
+                Main.spriteBatch.Draw(projectorRTSwap, Vector2.Zero, new Rectangle(0, 0, (int)(size.X), (int)(size.Y)), Color.White);
+                Main.spriteBatch.End();
+            }
+            if (structure.data.filter == (int)ProjectorData.FilterFlag.Blur)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    Utils.Swap(ref projectorRT, ref projectorRTSwap);
+                    Main.graphics.GraphicsDevice.SetRenderTargets(projectorRT);
+                    Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque, SamplerState.LinearClamp, DepthStencilState.None, Main.Rasterizer, null, Matrix.Identity);
+                    projectorFilterEffect.Parameters["uStep"].SetValue(1 * (i == 0 ? Vector2.UnitX : Vector2.UnitY) / size);
+                    projectorFilterEffect.CurrentTechnique.Passes["Blur"].Apply();
+                    Main.spriteBatch.Draw(projectorRTSwap, Vector2.Zero, new Rectangle(0, 0, (int)(size.X), (int)(size.Y)), Color.White);
+                    Main.spriteBatch.End();
+                }
+            }
         }
 
         public void DrawStructureFrame()
@@ -1328,6 +1113,108 @@ namespace ImmersiveProjector
                 QuickDrawBezier(s0, center, s1, color, 20);
                 QuickDrawBezier(t0, center, t1, color, 20);
             }
+        }
+
+        public void DrawProjectorLayer(int drawLayer)
+        {
+            // Prevent Recursion
+            if (projectorProcessing || drawLayer < 0)
+                return;
+
+            if (drawLayer == (int)ProjectorData.LayerFlag.BehindWalls)
+                PrepareClippingCache();
+            bool needDraw = TestNeedDrawProjectors(drawLayer);
+            if (needDraw)
+            {
+                Main.spriteBatch.End();
+
+                GraphicsDevice graphicsDevice = Main.graphics.GraphicsDevice;
+                RenderTargetBinding[] origTargets = graphicsDevice.GetRenderTargets();
+
+                // do not draw in retro mode
+                if (origTargets.Length > 0)
+                {
+                    var screenTarget = (RenderTarget2D)origTargets[0].RenderTarget;
+
+                    EnsureOverlayRT(screenTarget.Width, screenTarget.Height);
+                    graphicsDevice.SetRenderTarget(overlayRT);
+                    graphicsDevice.Clear(Color.Transparent);
+                    Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque);
+                    Main.spriteBatch.Draw(screenTarget, Vector2.Zero, Color.White);
+                    Main.spriteBatch.End();
+
+                    DrawProjectors(drawLayer);
+
+                    graphicsDevice.SetRenderTarget(screenTarget);
+
+                    Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque);
+                    Main.spriteBatch.Draw(overlayRT, Vector2.Zero, Color.White);
+                    Main.spriteBatch.End();
+                }
+
+                Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
+            }
+
+            if (drawLayer == (int)ProjectorData.LayerFlag.Foreground)
+            {
+                Main.spriteBatch.End();
+                if (uiSystem.projectorUIState.focusedInstance != null &&
+                    (uiSystem.projectorUIState.focusedInstance.data.sourceFollow != 0 ||
+                     uiSystem.projectorUIState.focusedInstance.data.targetFollow != 0))
+                {
+                    findingTargetFlag = true;
+                    DrawStructureFrame();
+                    findingTargetFlag = false;
+                }
+                DrawStructureFrame();
+                Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
+            }
+
+            if (drawLayer == (int)ProjectorData.LayerFlag.Foreground && delayedSpriteDraw != null)
+            {
+                Main.spriteBatch.End();
+                Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.UIScaleMatrix);
+                delayedSpriteDraw(Main.spriteBatch);
+                Main.spriteBatch.End();
+                delayedSpriteDraw = null;
+                Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
+            }
+
+        }
+
+        public bool TestNeedDrawProjectors(int layerFlag)
+        {
+            foreach (var s in projectorList)
+            {
+                TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
+                if (te != null && te is ProjectorTileEntity entity)
+                    if (s.data.layer == layerFlag && s.cacheNeedDraw)
+                        return true;
+            }
+            return false;
+        }
+
+        public void DrawProjectors(int layerFlag)
+        {
+            List<ProjectorInstance> drawList = new List<ProjectorInstance>();
+            foreach (var s in projectorList)
+            {
+                TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
+                if (te != null && te is ProjectorTileEntity entity && entity.projectorInstance != null)
+                {
+                    if (entity.projectorInstance != s)
+                    {
+                        continue;
+                    }
+                    if (s.cacheNeedDraw && s.data.layer == layerFlag)
+                        drawList.Add(s);
+                }
+            }
+            foreach (var s in drawList.OrderBy((ProjectorInstance s) => s.data.priority))
+            {
+                HookedDraw(s);
+            }
+
         }
 
         public void TileBatchDrawDecorator(On.Terraria.Graphics.TileBatch.orig_Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects orig,
@@ -1447,142 +1334,6 @@ namespace ImmersiveProjector
                 projector.updateCounter = 1f;
                 projector.lightingEngine.Rebuild();
             }
-        }
-
-        public void DrawCachedNPCsDecorator(On.Terraria.Main.orig_DrawCachedNPCs orig, Main self,
-                                            List<int> cachedList, bool behindTiles)
-        {
-            int drawLayer = -1;
-            if (cachedList == Main.instance.DrawCacheNPCsMoonMoon)
-                drawLayer = (int)ProjectorData.LayerFlag.BehindWalls;
-            if (cachedList == Main.instance.DrawCacheNPCsBehindNonSolidTiles)
-                drawLayer = (int)ProjectorData.LayerFlag.BehindFurnitures;
-            if (cachedList == Main.instance.DrawCacheNPCProjectiles)
-                drawLayer = (int)ProjectorData.LayerFlag.Normal;
-            if (cachedList == Main.instance.DrawCacheNPCsOverPlayers)
-                drawLayer = (int)ProjectorData.LayerFlag.Foreground;
-
-            // Prevent Recursion
-            if (projectorProcessing)
-                drawLayer = -1;
-
-            if (drawLayer != -1)
-            {
-                if (drawLayer == (int)ProjectorData.LayerFlag.BehindWalls)
-                    lock (projectorList)
-                    {
-                        foreach (var s in projectorList)
-                        {
-                            TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
-                            if (te != null && te is ProjectorTileEntity entity)
-                            {
-                                if (entity.projectorInstance != s)
-                                    continue;
-                                if (entity.TurnedOn && CalculateClippedArea(s, out var hitFlag, out var tl, out var br, out var to))
-                                {
-                                    s.cacheHitFlag = hitFlag;
-                                    s.cacheTopLeft = tl;
-                                    s.cacheBottomRight = br;
-                                    s.cacheTargetOffset = to;
-                                    s.cacheNeedDraw = true;
-                                }
-                            }
-                        }
-                    }
-                bool needDraw = TestNeedDrawProjectors(drawLayer);
-                if (needDraw)
-                {
-                    Main.spriteBatch.End();
-
-                    GraphicsDevice graphicsDevice = Main.graphics.GraphicsDevice;
-                    RenderTargetBinding[] origTargets = graphicsDevice.GetRenderTargets();
-
-                    if (origTargets.Length > 0)
-                    {
-                        var screenTarget = (RenderTarget2D)origTargets[0].RenderTarget;
-
-                        EnsureOverlayRT(screenTarget.Width, screenTarget.Height);
-                        graphicsDevice.SetRenderTarget(overlayRT);
-                        graphicsDevice.Clear(Color.Transparent);
-                        Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque);
-                        Main.spriteBatch.Draw(screenTarget, Vector2.Zero, Color.White);
-                        Main.spriteBatch.End();
-
-                        DrawProjectors(drawLayer);
-
-                        graphicsDevice.SetRenderTarget(screenTarget);
-
-                        Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque);
-                        Main.spriteBatch.Draw(overlayRT, Vector2.Zero, Color.White);
-                        Main.spriteBatch.End();
-                    }
-
-                    Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
-                }
-
-                if (cachedList == Main.instance.DrawCacheNPCsOverPlayers)
-                {
-                    Main.spriteBatch.End();
-                    if (uiSystem.projectorUIState.focusedInstance != null &&
-                        (uiSystem.projectorUIState.focusedInstance.data.sourceFollow != 0 ||
-                         uiSystem.projectorUIState.focusedInstance.data.targetFollow != 0))
-                    {
-                        findingTargetFlag = true;
-                        DrawStructureFrame();
-                        findingTargetFlag = false;
-                    }
-                    DrawStructureFrame();
-                    Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
-                }
-
-                if (drawLayer == (int)ProjectorData.LayerFlag.Foreground && delayedSpriteDraw != null)
-                {
-                    Main.spriteBatch.End();
-                    Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.UIScaleMatrix);
-                    delayedSpriteDraw(Main.spriteBatch);
-                    Main.spriteBatch.End();
-                    delayedSpriteDraw = null;
-                    Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.Transform);
-                }
-
-            }
-
-            orig(self, cachedList, behindTiles);
-        }
-
-        public bool TestNeedDrawProjectors(int layerFlag)
-        {
-            foreach (var s in projectorList)
-            {
-                TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
-                if (te != null && te is ProjectorTileEntity entity)
-                    if (s.data.layer == layerFlag && s.cacheNeedDraw)
-                        return true;
-            }
-            return false;
-        }
-
-        public void DrawProjectors(int layerFlag)
-        {
-            List<ProjectorInstance> drawList = new List<ProjectorInstance>();
-            foreach (var s in projectorList)
-            {
-                TileEntity.ByPosition.TryGetValue(new Point16(s.tilePosition.X, s.tilePosition.Y), out var te);
-                if (te != null && te is ProjectorTileEntity entity && entity.projectorInstance != null)
-                {
-                    if (entity.projectorInstance != s)
-                    {
-                        continue;
-                    }
-                    if (s.cacheNeedDraw && s.data.layer == layerFlag)
-                        drawList.Add(s);
-                }
-            }
-            foreach (var s in drawList.OrderBy((ProjectorInstance s) => s.data.priority))
-            {
-                HookedDraw(s);
-            }
-
         }
 
         public void ScreenEffectDecorator(On.Terraria.Graphics.Effects.FilterManager.orig_EndCapture orig,
@@ -1791,81 +1542,6 @@ namespace ImmersiveProjector
             perFrameLights.Clear();
             foreach (var p in perFrameLightList)
                 perFrameLights.Add(p);
-        }
-
-        // Hack for XNA sprite batch
-        // Hack XNA sprite batch by adding scales to eradicate gaps between tiles
-        public class SpriteBatchHack
-        {
-            public Type typeOfSpriteInfo;
-            public Type arrayOfSpriteInfo;
-            public FieldInfo spriteInfosField;
-            public FieldInfo numSpritesField;
-            public FieldInfo destinationWField;
-            public FieldInfo destinationHField;
-            public FieldInfo depthField;
-
-            public SpriteBatchHack()
-            {
-                typeOfSpriteInfo = typeof(SpriteBatch).Assembly.GetTypes().Where((x) => x.IsNestedPrivate && x.Name.Equals("SpriteInfo")).ToArray()[0];
-                arrayOfSpriteInfo = typeOfSpriteInfo.MakeArrayType();
-                spriteInfosField = typeof(SpriteBatch).GetField("spriteInfos", BindingFlags.Instance | BindingFlags.NonPublic);
-                numSpritesField = typeof(SpriteBatch).GetField("numSprites", BindingFlags.Instance | BindingFlags.NonPublic);
-                destinationWField = typeOfSpriteInfo.GetField("destinationW", BindingFlags.Public | BindingFlags.Instance);
-                destinationHField = typeOfSpriteInfo.GetField("destinationH", BindingFlags.Public | BindingFlags.Instance);
-                depthField = typeOfSpriteInfo.GetField("depth", BindingFlags.Public | BindingFlags.Instance);
-            }
-
-            public void HackSpriteBatchScale(SpriteBatch spriteBatch, float scaleFactor)
-            {
-
-                Array spriteInfos = (Array)spriteInfosField.GetValue(spriteBatch);
-                int numSprites = (int)numSpritesField.GetValue(spriteBatch);
-
-                for (int i = 0; i < numSprites; i++)
-                {
-                    object boxed = spriteInfos.GetValue(i);
-                    float destinationH = (float)destinationHField.GetValue(boxed);
-                    destinationHField.SetValue(boxed, destinationH * scaleFactor);
-                    float destinationW = (float)destinationWField.GetValue(boxed);
-                    destinationWField.SetValue(boxed, destinationW * scaleFactor);
-                    depthField.SetValue(boxed, 1 - i / (float)(numSprites + 1));
-                    spriteInfos.SetValue(boxed, i);
-                }
-            }
-        }
-
-        public Matrix CreateMVP(Vector2 worldPosOffset)
-        {
-            Matrix mvp =
-                Matrix.CreateTranslation
-                (
-                    Main.GameViewMatrix.Zoom.X * ((worldPosOffset.X - Main.screenPosition.X) - Main.screenWidth * 0.5f),
-                    Main.GameViewMatrix.Zoom.Y * (-(worldPosOffset.Y - Main.screenPosition.Y) + Main.screenHeight * 0.5f),
-                    2000
-                ) *
-                Matrix.CreateLookAt(Vector3.UnitZ, Vector3.Zero, -Vector3.UnitY) *
-                Matrix.CreatePerspective(Main.screenWidth * 0.25f, Main.screenHeight * 0.25f, 500, 10000);
-            return mvp;
-        }
-
-        private struct SimpleVertexInfo : IVertexType
-        {
-            private static VertexDeclaration _VertexDeclaration = new VertexDeclaration(new VertexElement[2]
-            {
-                new VertexElement(0, VertexElementFormat.Vector3, VertexElementUsage.Position, 0),
-                new VertexElement(3 * sizeof(float), VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0)
-            });
-            public Vector3 position;
-            public Vector2 texCoord;
-
-            public SimpleVertexInfo(Vector3 pos, Vector2 uv)
-            {
-                position = pos;
-                texCoord = uv;
-            }
-
-            public VertexDeclaration VertexDeclaration { get => _VertexDeclaration; }
         }
     }
 }

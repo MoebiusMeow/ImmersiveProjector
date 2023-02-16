@@ -124,6 +124,8 @@ Mods: {
 			CaptureFilter: 视觉特效
 			CaptureFilterN: 无滤镜
 			CaptureFilterH: 全息特效
+			CaptureFilterO: 描边
+			CaptureFilterB: 高斯模糊
 
 			Cancel: 取消
 			Hide: 隐藏

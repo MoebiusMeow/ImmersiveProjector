@@ -123,6 +123,8 @@ Mods: {
 			CaptureFilter: Visual effects
 			CaptureFilterN: No Filter 
 			CaptureFilterH: Hologram
+			CaptureFilterO: Outline
+			CaptureFilterB: Gaussian Blur
 
 			Cancel: Cancel
 			Hide: Hide

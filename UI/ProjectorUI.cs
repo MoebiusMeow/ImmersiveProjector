@@ -776,7 +776,7 @@ namespace ImmersiveProjector.UI
 			ColorAVPanel.Height.Set(40, 0);
 			page.Append(ColorAVPanel);
 
-			TogglePanel captureFilterVPanel = new TogglePanel(2, toggleItemTexture, new Rectangle(0, 32 * 6, 32, 32), panelBackground);
+			TogglePanel captureFilterVPanel = new TogglePanel(4, toggleItemTexture, new Rectangle(0, 32 * 6, 32, 32), panelBackground);
 			captureFilterVPanel.Width.Set(0, 1);
 			captureFilterVPanel.Top.Set(-(tabHeight[index] - 220), 1);
 			captureFilterVPanel.Height.Set(40, 0);
@@ -788,6 +788,8 @@ namespace ImmersiveProjector.UI
 			{
                 ImmersiveProjector.ModTranslate("CaptureFilterN", "Config."),
                 ImmersiveProjector.ModTranslate("CaptureFilterH", "Config."),
+                ImmersiveProjector.ModTranslate("CaptureFilterO", "Config."),
+                ImmersiveProjector.ModTranslate("CaptureFilterB", "Config."),
 			};
 			page.Append(captureFilterVPanel);
 

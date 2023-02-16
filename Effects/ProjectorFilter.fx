@@ -1,6 +1,7 @@
 ﻿float3 uRGB;
 float3 uHSV;
 float uAlpha;
+float2 uStep;
 bool uPrem;
 sampler uImage0 : register(s0);
 
@@ -40,17 +41,39 @@ float4 hsv_frag(float2 coords : TEXCOORD0) : COLOR0 {
     [flatten]
     if (t == 0) { R = v; G = Z; B = X; }
     [flatten]
-	if (t == 1) { R = Y; G = v; B = X; }
+    if (t == 1) { R = Y; G = v; B = X; }
     [flatten]
-	if (t == 2) { R = X; G = v; B = Z; }
+    if (t == 2) { R = X; G = v; B = Z; }
     [flatten]
-	if (t == 3) { R = X; G = Y; B = v; }
+    if (t == 3) { R = X; G = Y; B = v; }
     [flatten]
-	if (t == 4) { R = Z; G = X; B = v; }
+    if (t == 4) { R = Z; G = X; B = v; }
     [flatten]
-	if (t == 5) { R = v; G = X; B = Y; }
+    if (t == 5) { R = v; G = X; B = Y; }
 
     return uPrem ? float4(R, G, B, 1) * color.a * uAlpha : float4(R, G, B, color.a * uAlpha);
+}
+
+float4 border_frag(float2 coords : TEXCOORD0) : COLOR0 {
+    float4 color = tex2D(uImage0, coords);
+    float4 l = tex2D(uImage0, coords + float2(-uStep.x, 0));
+    float4 r = tex2D(uImage0, coords + float2(+uStep.x, 0));
+    float4 u = tex2D(uImage0, coords + float2(0, -uStep.y));
+    float4 d = tex2D(uImage0, coords + float2(0, +uStep.y));
+    return (color.a == 0 && (l.a > 0 || r.a > 0 || u.a > 0 || d.a > 0)) ? float4(0, 0, 0, 0.5) : color;
+}
+
+float4 blur_frag(float2 coords : TEXCOORD0) : COLOR0 {
+    float4 color = 0.227027 * tex2D(uImage0, coords)
+                 + 0.1945946 * tex2D(uImage0, coords - uStep)
+                 + 0.1945946 * tex2D(uImage0, coords + uStep)
+                 + 0.1216216 * tex2D(uImage0, coords - uStep * 2)
+                 + 0.1216216 * tex2D(uImage0, coords + uStep * 2)
+                 + 0.054054 * tex2D(uImage0, coords - uStep * 3)
+                 + 0.054054 * tex2D(uImage0, coords + uStep * 3)
+                 + 0.016216 * tex2D(uImage0, coords - uStep * 4)
+                 + 0.016216 * tex2D(uImage0, coords + uStep * 4);
+    return color;
 }
 
 technique Technique233
@@ -58,5 +81,13 @@ technique Technique233
     pass HSV 
     { 
         PixelShader = compile ps_3_0 hsv_frag(); 
+    }
+    pass Border 
+    { 
+        PixelShader = compile ps_3_0 border_frag(); 
+    }
+    pass Blur
+    { 
+        PixelShader = compile ps_3_0 blur_frag(); 
     }
 }

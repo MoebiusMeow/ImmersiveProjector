@@ -62,7 +62,9 @@ namespace ImmersiveProjector.DataStructure
         public enum FilterFlag
         {
             None = 0,
-            Holographic = 1
+            Holographic = 1,
+            Border = 2,
+            Blur = 3,
         }
         public enum CaptureSolidFlag
         {
