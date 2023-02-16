@@ -11,8 +11,6 @@ namespace ImmersiveProjector.Items
     {
         public override void SetStaticDefaults()
         {
-            // DisplayName.SetDefault("Hookshot Spot");
-            // Tooltip.SetDefault("Placeable hookshot spot.");
             CreativeItemSacrificesCatalog.Instance.SacrificeCountNeededByItemId[Type] = 1;
         }
 
@@ -36,7 +34,7 @@ namespace ImmersiveProjector.Items
             recipe.AddIngredient(ItemID.Glass);
             recipe.AddIngredient(ItemID.FallenStar, 3);
             recipe.AddTile(TileID.WorkBenches);
-			recipe.Register();
-		}
+            recipe.Register();
+        }
     }
 }

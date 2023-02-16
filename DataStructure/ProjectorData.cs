@@ -14,8 +14,8 @@ using static Terraria.WaterfallManager;
 namespace ImmersiveProjector.DataStructure
 {
     [Serializable]
-	public class ProjectorData 
-	{
+    public class ProjectorData 
+    {
         public enum FlipFlag
         {
             None = 0,
@@ -227,6 +227,6 @@ namespace ImmersiveProjector.DataStructure
             var result = JsonSerializer.Serialize<ProjectorData>(this, options);
             return result;
         }
-	}
+    }
 
 }

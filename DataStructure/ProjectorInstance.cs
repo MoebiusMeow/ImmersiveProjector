@@ -13,7 +13,7 @@ using static Terraria.WaterfallManager;
 
 namespace ImmersiveProjector.DataStructure
 {
-	public class ProjectorInstance
+    public class ProjectorInstance
     {
         public bool active = true;
         public ProjectorData data;
@@ -79,14 +79,14 @@ namespace ImmersiveProjector.DataStructure
 
         public bool TurnedOn()
         {
-			if (data == null)
+            if (data == null)
                 return false;
             return data.turnedOn > 0;
             /*
-			if (!TileEntity.ByPosition.TryGetValue(tilePosition.ToVector2().ToPoint16(), out var te))
-				return false;
-			if (!(te is ProjectorTileEntity entity))
-				return false;
+            if (!TileEntity.ByPosition.TryGetValue(tilePosition.ToVector2().ToPoint16(), out var te))
+                return false;
+            if (!(te is ProjectorTileEntity entity))
+                return false;
             return entity.TurnedOn;
             */
         }
