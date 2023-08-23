@@ -287,7 +287,7 @@ namespace ImmersiveProjector.UI
                     "Camera_7",
                     // "Bestiary/Slot_Selection",
                 };
-            for (var i = 0; i < testAssets.Length; i++)
+            for (var i = 0; i < 0 * testAssets.Length; i++)
             {
                 Asset<Texture2D> asset2 = Main.Assets.Request<Texture2D>("Images/UI/" + testAssets[i]);
                 PresetFrame btn2 = new PresetFrame(assetSlotFront, assetSlotHover, assetSlotBack, asset2, -1, i.ToString() + "Testing Testing")
@@ -302,7 +302,7 @@ namespace ImmersiveProjector.UI
             minorSep.Width.Set(0, 1f);
             minorSep.Color = new Color(0.1f, 0.2f, 0.4f) * 0.4f;
             uiList.Add(minorSep);
-            for (var i = 0; i < testAssets.Length; i++)
+            for (var i = 0; i < 0 * testAssets.Length; i++)
             {
                 Asset<Texture2D> asset2 = Main.Assets.Request<Texture2D>("Images/UI/" + testAssets[testAssets.Length - 1]);
                 UIElement btn2 = new PresetFrame(assetSlotFront, assetSlotHover, assetSlotBack, asset2, 1, "This is long uwu")

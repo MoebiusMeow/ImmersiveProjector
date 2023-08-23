@@ -168,6 +168,8 @@ namespace ImmersiveProjector
             On_TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects += TileBatchDrawDecorator;
             On_TileBatch.InternalDraw += TileBatchInternalDrawDecorator;
             On_Lighting.Initialize += LightingInitializeDecorator;
+            On_LightingEngine.GetColor += On_LightingEngineGetColor;
+            On_LegacyLighting.GetColor += On_LegacyLighting_GetColor;
             On_Dust.NewDust += NewDustDecorator;
             On_Gore.NewGore_IEntitySource_Vector2_Vector2_int_float += NewGoreDecorator;
             IL_Dust.UpdateDust += UpdateDustILEdit;
@@ -202,6 +204,8 @@ namespace ImmersiveProjector
             On_TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects -= TileBatchDrawDecorator;
             On_TileBatch.InternalDraw -= TileBatchInternalDrawDecorator;
             On_Lighting.Initialize -= LightingInitializeDecorator;
+            On_LightingEngine.GetColor -= On_LightingEngineGetColor;
+            On_LegacyLighting.GetColor -= On_LegacyLighting_GetColor;
             On_Dust.NewDust -= NewDustDecorator;
             On_Gore.NewGore_IEntitySource_Vector2_Vector2_int_float -= NewGoreDecorator;
             IL_Dust.UpdateDust -= UpdateDustILEdit;
@@ -967,6 +971,11 @@ namespace ImmersiveProjector
                     bool flipX = (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Horizontal) != structure.cacheFollowFlipFlag;
                     bool flipY = (structure.data.targetFlip == (int)ProjectorData.FlipFlag.Vertical);
                     var tuple = structure.referenceLightingCacheSwap as Tuple<Rectangle, Vector3[]>;
+
+                    var origProcessing = projectorProcessing;
+                    // To get the vanilla lighting output
+                    projectorProcessing = false;
+
                     for (int i = lightingArea.X - 1; i < lightingArea.X + lightingArea.Width + 1; i++)
                         for (int j = lightingArea.Y - 1; j < lightingArea.Y + lightingArea.Height + 1; j++)
                         {
@@ -979,10 +988,11 @@ namespace ImmersiveProjector
                             [
                                 (i - tuple.Item1.Left) * tuple.Item1.Height +
                                  j - tuple.Item1.Top
-                            ] = origLightingEngineCache.GetColor((int)referencePosition.X, (int)referencePosition.Y) * Lighting.GlobalBrightness;
+                            ] = origLightingEngineCache.GetColor((int)referencePosition.X, (int)referencePosition.Y);
                         }
                     Utils.Swap(ref structure.referenceLightingCache, ref structure.referenceLightingCacheSwap);
                     referenceLightingCache = structure.referenceLightingCache;
+                    projectorProcessing = origProcessing;
                 }
             }
         }
@@ -1241,42 +1251,84 @@ namespace ImmersiveProjector
             orig(self, texture, destinationRectangle, sourceRectangle, colors, rotation, origin, effect, depth);
         }
 
-        public Color LightColorDecorator(On_Lighting.orig_GetColor_int_int orig, int i, int j)
+        private Vector3 On_LegacyLighting_GetColor(On_LegacyLighting.orig_GetColor orig, LegacyLighting self, int i, int j)
         {
-            // Hack lighting engine to ensure dark tiles to be drawn
             if (projectorProcessing)
             {
-                Color result;
+                Vector3 result;
                 switch (lightingCombination)
                 {
                     case ProjectorData.LightingSourceFlag.Source:
-                        result = orig(i, j);
+                        result = orig(self, i, j);
                         break;
                     case ProjectorData.LightingSourceFlag.Target:
-                        result = new Color(
+                        result = 
                             referenceLightingCache.Item1.Contains(i, j) ?  referenceLightingCache.Item2
                                 [(i - referenceLightingCache.Item1.Left) * referenceLightingCache.Item1.Height +
                                   j - referenceLightingCache.Item1.Top] :
-                                Vector3.Zero);
+                                Vector3.Zero;
                         break;
                     case ProjectorData.LightingSourceFlag.Both:
-                        result = orig(i, j);
-                        result = new Color(result.ToVector3() + 
+                        result = orig(self, i, j);
+                        result = result + 
                             (referenceLightingCache.Item1.Contains(i, j) ?  referenceLightingCache.Item2
                                 [(i - referenceLightingCache.Item1.Left) * referenceLightingCache.Item1.Height +
-                                  j - referenceLightingCache.Item1.Top] : Vector3.Zero));
+                                  j - referenceLightingCache.Item1.Top] : Vector3.Zero);
                         break;
                     default:
-                        return Color.Black;
-                }
-                if (result.R < 1 && result.G < 1 && result.B < 1)
-                {
-                    result.R = 1;
+                        return Vector3.Zero;
                 }
                 return result;
             }
             else
-                return orig(i, j);
+                return orig(self, i, j);
+        }
+
+        private Vector3 On_LightingEngineGetColor(On_LightingEngine.orig_GetColor orig, LightingEngine self, int i, int j)
+        {
+            if (projectorProcessing)
+            {
+                Vector3 result;
+                switch (lightingCombination)
+                {
+                    case ProjectorData.LightingSourceFlag.Source:
+                        result = orig(self, i, j);
+                        break;
+                    case ProjectorData.LightingSourceFlag.Target:
+                        result = 
+                            referenceLightingCache.Item1.Contains(i, j) ?  referenceLightingCache.Item2
+                                [(i - referenceLightingCache.Item1.Left) * referenceLightingCache.Item1.Height +
+                                  j - referenceLightingCache.Item1.Top] :
+                                Vector3.Zero;
+                        break;
+                    case ProjectorData.LightingSourceFlag.Both:
+                        result = orig(self, i, j);
+                        result = result + 
+                            (referenceLightingCache.Item1.Contains(i, j) ?  referenceLightingCache.Item2
+                                [(i - referenceLightingCache.Item1.Left) * referenceLightingCache.Item1.Height +
+                                  j - referenceLightingCache.Item1.Top] : Vector3.Zero);
+                        break;
+                    default:
+                        return Vector3.Zero;
+                }
+                return result;
+            }
+            else
+                return orig(self, i, j);
+        }
+
+        private Color LightColorDecorator(On_Lighting.orig_GetColor_int_int orig, int i, int j)
+        {
+            Color result = orig(i, j);
+            // Hack lighting engine to ensure dark tiles to be drawn
+            if (projectorProcessing)
+            {
+                if (result.R < 1 && result.G < 1 && result.B < 1)
+                {
+                    result.R = 1;
+                }
+            }
+            return result;
         }
 
         public Color LightOverrideDecorator(On_TileDrawing.orig_DrawTiles_GetLightOverride orig,
