@@ -24,12 +24,13 @@ using Terraria.GameInput;
 using Terraria.Graphics.Capture;
 using Terraria.GameContent.Events;
 using System.Linq.Expressions;
-using Humanizer;
 using Terraria.IO;
 using MonoMod.Cil;
 using Mono.Cecil.Cil;
 using Terraria.ID;
 using static ImmersiveProjector.ProjectorUtils;
+using Terraria.Graphics.Effects;
+using Humanizer;
 
 namespace ImmersiveProjector
 {
@@ -162,20 +163,20 @@ namespace ImmersiveProjector
             wallDrawing = Main.instance.WallsRenderer;
             projectorTileDrawing = new TileDrawing(tilePaintSystem);
             projectorList = new List<ProjectorInstance>();
-            On.Terraria.Graphics.Effects.FilterManager.EndCapture += ScreenEffectDecorator;
-            On.Terraria.Lighting.GetColor_int_int += LightColorDecorator;
-            On.Terraria.Graphics.TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects += TileBatchDrawDecorator;
-            On.Terraria.Graphics.TileBatch.InternalDraw += TileBatchInternalDrawDecorator;
-            On.Terraria.Lighting.Initialize += LightingInitializeDecorator;
-            On.Terraria.Dust.NewDust += NewDustDecorator;
-            On.Terraria.Gore.NewGore_IEntitySource_Vector2_Vector2_int_float += NewGoreDecorator;
-            IL.Terraria.Dust.UpdateDust += UpdateDustILEdit;
+            On_FilterManager.EndCapture += ScreenEffectDecorator;
+            On_Lighting.GetColor_int_int += LightColorDecorator;
+            On_TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects += TileBatchDrawDecorator;
+            On_TileBatch.InternalDraw += TileBatchInternalDrawDecorator;
+            On_Lighting.Initialize += LightingInitializeDecorator;
+            On_Dust.NewDust += NewDustDecorator;
+            On_Gore.NewGore_IEntitySource_Vector2_Vector2_int_float += NewGoreDecorator;
+            IL_Dust.UpdateDust += UpdateDustILEdit;
 
-            On.Terraria.GameContent.Drawing.TileDrawing.PostDrawTiles += DrawHook_TileEntities;
-            On.Terraria.Main.DoDraw_UpdateCameraPosition += DrawHook_UpdateCameraPosition;
-            On.Terraria.Main.DrawCachedProjs += DrawHook_CachedProjs;
-            On.Terraria.Main.DrawCachedNPCs += DrawHook_CachedNPCs;
-            On.Terraria.Main.DrawCapture += DrawHook_Capture;
+            On_TileDrawing.PostDrawTiles += DrawHook_TileEntities;
+            On_Main.DoDraw_UpdateCameraPosition += DrawHook_UpdateCameraPosition;
+            On_Main.DrawCachedProjs += DrawHook_CachedProjs;
+            On_Main.DrawCachedNPCs += DrawHook_CachedNPCs;
+            On_Main.DrawCapture += DrawHook_Capture;
 
             legacyLightingRebuilt = false;
             base.Load();
@@ -196,20 +197,20 @@ namespace ImmersiveProjector
 
         public override void Unload()
         {
-            On.Terraria.Graphics.Effects.FilterManager.EndCapture -= ScreenEffectDecorator;
-            On.Terraria.Lighting.GetColor_int_int -= LightColorDecorator;
-            On.Terraria.Graphics.TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects -= TileBatchDrawDecorator;
-            On.Terraria.Graphics.TileBatch.InternalDraw -= TileBatchInternalDrawDecorator;
-            On.Terraria.Lighting.Initialize -= LightingInitializeDecorator;
-            On.Terraria.Dust.NewDust -= NewDustDecorator;
-            On.Terraria.Gore.NewGore_IEntitySource_Vector2_Vector2_int_float -= NewGoreDecorator;
-            IL.Terraria.Dust.UpdateDust -= UpdateDustILEdit;
+            On_FilterManager.EndCapture -= ScreenEffectDecorator;
+            On_Lighting.GetColor_int_int -= LightColorDecorator;
+            On_TileBatch.Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects -= TileBatchDrawDecorator;
+            On_TileBatch.InternalDraw -= TileBatchInternalDrawDecorator;
+            On_Lighting.Initialize -= LightingInitializeDecorator;
+            On_Dust.NewDust -= NewDustDecorator;
+            On_Gore.NewGore_IEntitySource_Vector2_Vector2_int_float -= NewGoreDecorator;
+            IL_Dust.UpdateDust -= UpdateDustILEdit;
 
-            On.Terraria.GameContent.Drawing.TileDrawing.PostDrawTiles -= DrawHook_TileEntities;
-            On.Terraria.Main.DoDraw_UpdateCameraPosition -= DrawHook_UpdateCameraPosition;
-            On.Terraria.Main.DrawCachedProjs -= DrawHook_CachedProjs;
-            On.Terraria.Main.DrawCachedNPCs -= DrawHook_CachedNPCs;
-            On.Terraria.Main.DrawCapture -= DrawHook_Capture;
+            On_TileDrawing.PostDrawTiles -= DrawHook_TileEntities;
+            On_Main.DoDraw_UpdateCameraPosition -= DrawHook_UpdateCameraPosition;
+            On_Main.DrawCachedProjs -= DrawHook_CachedProjs;
+            On_Main.DrawCachedNPCs -= DrawHook_CachedNPCs;
+            On_Main.DrawCapture -= DrawHook_Capture;
 
             base.Unload();
         }
@@ -236,7 +237,7 @@ namespace ImmersiveProjector
         }
 
 
-        private void DrawHook_Capture(On.Terraria.Main.orig_DrawCapture orig, Main self, Rectangle area, CaptureSettings settings)
+        private void DrawHook_Capture(On_Main.orig_DrawCapture orig, Main self, Rectangle area, CaptureSettings settings)
         {
             var origScreenPosition = Main.screenPosition;
             var origScreenWidth = Main.screenWidth;
@@ -254,17 +255,17 @@ namespace ImmersiveProjector
             Main.screenHeight = origScreenHeight;
         }
 
-        private void DrawHook_UpdateCameraPosition(On.Terraria.Main.orig_DoDraw_UpdateCameraPosition orig)
+        private void DrawHook_UpdateCameraPosition(On_Main.orig_DoDraw_UpdateCameraPosition orig)
         {
             orig();
         }
 
-        private void DrawHook_TileEntities(On.Terraria.GameContent.Drawing.TileDrawing.orig_PostDrawTiles orig, TileDrawing self, bool solidLayer, bool forRenderTargets, bool intoRenderTargets)
+        private void DrawHook_TileEntities(On_TileDrawing.orig_PostDrawTiles orig, TileDrawing self, bool solidLayer, bool forRenderTargets, bool intoRenderTargets)
         {
             orig(self, solidLayer, forRenderTargets, intoRenderTargets);
         }
 
-        private void DrawHook_CachedProjs(On.Terraria.Main.orig_DrawCachedProjs orig, Main self, List<int> projCache, bool startSpriteBatch)
+        private void DrawHook_CachedProjs(On_Main.orig_DrawCachedProjs orig, Main self, List<int> projCache, bool startSpriteBatch)
         {
             if (projCache == Main.instance.DrawCacheProjsOverWiresUI)
             {
@@ -285,7 +286,7 @@ namespace ImmersiveProjector
             orig(self, projCache, startSpriteBatch);
         }
 
-        private void DrawHook_CachedNPCs(On.Terraria.Main.orig_DrawCachedNPCs orig, Main self, List<int> npcCache, bool behindTiles)
+        private void DrawHook_CachedNPCs(On_Main.orig_DrawCachedNPCs orig, Main self, List<int> npcCache, bool behindTiles)
         {
             if (npcCache == Main.instance.DrawCacheNPCsMoonMoon)
                 DrawProjectorLayer((int)ProjectorData.LayerFlag.BehindWalls);
@@ -427,8 +428,8 @@ namespace ImmersiveProjector
             // We should only clear the pixels we need
 
             Rectangle renderRect = new Rectangle(0, 0,
-                (int)Math.Ceiling(expandFlag ? sourceSize.X : targetSize.X),
-                (int)Math.Ceiling(expandFlag ? sourceSize.Y : targetSize.Y));
+                (int)Math.Ceiling(expandFlag ? sourceSize.X : targetSize.X) + 5,
+                (int)Math.Ceiling(expandFlag ? sourceSize.Y : targetSize.Y) + 5);
             // If we need to clear a relatively large area
             if (renderRect.Width * (float)renderRect.Height >= 0.5f * projectorRT.Width * (float)projectorRT.Height)
             {
@@ -477,7 +478,8 @@ namespace ImmersiveProjector
                 LiquidRenderer.Instance.PrepareDraw(liquidArea);
                 Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
                     Main.Rasterizer, null, Matrix.CreateScale(projectorLiquidToScale));
-                LiquidRenderer.Instance.Draw(Main.spriteBatch, -sourceTopLeft, Main.waterStyle, Main.liquidAlpha[Main.waterStyle], true);
+                LiquidRenderer.Instance.DrawNormalLiquids(Main.spriteBatch, -sourceTopLeft, Main.waterStyle, Main.liquidAlpha[Main.waterStyle], true);
+                LiquidRenderer.Instance.DrawShimmer(Main.spriteBatch, -sourceTopLeft, true);
                 Main.spriteBatch.End();
                 projectorLiquidProcessing = false;
                 Main.GameViewMatrix = new Terraria.Graphics.SpriteViewMatrix(Main.graphics.GraphicsDevice);
@@ -709,7 +711,8 @@ namespace ImmersiveProjector
                 }
                 Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointWrap, DepthStencilState.None,
                     Main.Rasterizer, null, Matrix.CreateScale(projectorLiquidToScale));
-                LiquidRenderer.Instance.Draw(Main.spriteBatch, -sourceTopLeft, Main.waterStyle, Main.liquidAlpha[Main.waterStyle], false);
+                LiquidRenderer.Instance.DrawNormalLiquids(Main.spriteBatch, -sourceTopLeft, Main.waterStyle, Main.liquidAlpha[Main.waterStyle], false);
+                LiquidRenderer.Instance.DrawShimmer(Main.spriteBatch, -sourceTopLeft, false);
                 Main.spriteBatch.End();
                 projectorLiquidProcessing = false;
                 Main.GameViewMatrix = new Terraria.Graphics.SpriteViewMatrix(Main.graphics.GraphicsDevice);
@@ -772,7 +775,7 @@ namespace ImmersiveProjector
                                                 .RotatedBy(-structure.data.targetRotation * MathF.PI / 180f)
                                                 / structure.data.targetScale
                                                 * new Vector2(flipX ? -1 : 1, flipY ? -1 : 1))
-                                                + structure.data.sourcePoint);
+                                                + structure.data.sourcePoint + structure.cacheSourceOffset);
                     Point referencePoint = (referencePosition / 16).ToPoint();
                     if (referencePoint.X >= 5 && referencePoint.Y >= 5 && referencePoint.X < Main.maxTilesX - 5 && referencePoint.Y < Main.maxTilesY - 5)
                     {
@@ -967,7 +970,7 @@ namespace ImmersiveProjector
                     for (int i = lightingArea.X - 1; i < lightingArea.X + lightingArea.Width + 1; i++)
                         for (int j = lightingArea.Y - 1; j < lightingArea.Y + lightingArea.Height + 1; j++)
                         {
-                            Vector2 referencePosition = (((new Vector2(i * 16 + 8, j * 16 + 8) - structure.data.sourcePoint)
+                            Vector2 referencePosition = (((new Vector2(i * 16 + 8, j * 16 + 8) - (structure.data.sourcePoint + structure.cacheSourceOffset))
                                                         * new Vector2(flipX ? -1 : 1, flipY ? -1 : 1))
                                                         .RotatedBy(structure.data.targetRotation * MathF.PI / 180f)
                                                         * structure.data.targetScale
@@ -991,7 +994,7 @@ namespace ImmersiveProjector
                 Utils.Swap(ref projectorRT, ref projectorRTSwap);
                 Main.graphics.GraphicsDevice.SetRenderTargets(projectorRT);
                 Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque, SamplerState.PointClamp, DepthStencilState.None, Main.Rasterizer, null, Matrix.Identity);
-                projectorFilterEffect.Parameters["uStep"].SetValue(Vector2.One / size);
+                projectorFilterEffect.Parameters["uStep"].SetValue(2 * Vector2.One / projectorRT.Size());
                 projectorFilterEffect.CurrentTechnique.Passes["Border"].Apply();
                 Main.spriteBatch.Draw(projectorRTSwap, Vector2.Zero, new Rectangle(0, 0, (int)(size.X), (int)(size.Y)), Color.White);
                 Main.spriteBatch.End();
@@ -1003,7 +1006,7 @@ namespace ImmersiveProjector
                     Utils.Swap(ref projectorRT, ref projectorRTSwap);
                     Main.graphics.GraphicsDevice.SetRenderTargets(projectorRT);
                     Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque, SamplerState.LinearClamp, DepthStencilState.None, Main.Rasterizer, null, Matrix.Identity);
-                    projectorFilterEffect.Parameters["uStep"].SetValue(1 * (i == 0 ? Vector2.UnitX : Vector2.UnitY) / size);
+                    projectorFilterEffect.Parameters["uStep"].SetValue(2 * (i == 0 ? Vector2.UnitX : Vector2.UnitY) / projectorRT.Size());
                     projectorFilterEffect.CurrentTechnique.Passes["Blur"].Apply();
                     Main.spriteBatch.Draw(projectorRTSwap, Vector2.Zero, new Rectangle(0, 0, (int)(size.X), (int)(size.Y)), Color.White);
                     Main.spriteBatch.End();
@@ -1019,10 +1022,10 @@ namespace ImmersiveProjector
             if (structure == null || structure.data == null)
                 return;
 
-            Vector2 targetBoundingR = structure.targetSize.RotatedBy(structure.data.targetRotation / 180f * MathF.PI) * 0.5f;
+            Vector2 targetBoundingR = structure.TargetSize.RotatedBy(structure.data.targetRotation / 180f * MathF.PI) * 0.5f;
             targetBoundingR.X = MathF.Abs(targetBoundingR.X);
             targetBoundingR.Y = MathF.Abs(targetBoundingR.Y);
-            Vector2 targetBoundingR2 = (structure.targetSize * new Vector2(-1, 1)).RotatedBy(structure.data.targetRotation / 180f * MathF.PI) * 0.5f;
+            Vector2 targetBoundingR2 = (structure.TargetSize * new Vector2(-1, 1)).RotatedBy(structure.data.targetRotation / 180f * MathF.PI) * 0.5f;
             targetBoundingR2.X = MathF.Abs(targetBoundingR2.X);
             targetBoundingR2.Y = MathF.Abs(targetBoundingR2.Y);
             targetBoundingR.X = MathF.Max(targetBoundingR.X, targetBoundingR2.X);
@@ -1049,7 +1052,7 @@ namespace ImmersiveProjector
                     t1 += followOffset;
                     if (structure.cacheNeedDraw || !findingTargetFlag)
                     {
-                        QuickDrawBox(structure.sourceTopLeft + followOffset, structure.data.sourceSize, color);
+                        QuickDrawBox(structure.SourceTopLeft + followOffset, structure.data.sourceSize, color);
                         QuickDrawLine(s0, t0, color);
                         QuickDrawLine(s1, t1, color);
                         QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
@@ -1068,7 +1071,7 @@ namespace ImmersiveProjector
                     QuickDrawLine(s1, t1, color);
                     QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
                     QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
-                    QuickDrawBox(structure.targetTopLeft + followOffset, structure.data.targetSize, color);
+                    QuickDrawBox(structure.TargetTopLeft + followOffset, structure.data.targetSize, color);
                     QuickDrawBox(targetBoundTopLeft + followOffset, targetBoundingR * 2, color);
                     if (structure.cacheParallaxOffset.Length() > 0)
                     {
@@ -1091,8 +1094,8 @@ namespace ImmersiveProjector
                     QuickDrawLine(s1, t1, color);
                     QuickDrawLine(new Vector2(s0.X, s1.Y), new Vector2(t0.X, t1.Y), color);
                     QuickDrawLine(new Vector2(s1.X, s0.Y), new Vector2(t1.X, t0.Y), color);
-                    QuickDrawBox(structure.sourceTopLeft, structure.data.sourceSize, color);
-                    QuickDrawBox(structure.targetTopLeft, structure.data.targetSize, color);
+                    QuickDrawBox(structure.SourceTopLeft, structure.data.sourceSize, color);
+                    QuickDrawBox(structure.TargetTopLeft, structure.data.targetSize, color);
                     QuickDrawBox(targetBoundTopLeft, targetBoundingR * 2, color);
                     if (structure.cacheParallaxOffset.Length() > 0)
                     {
@@ -1217,7 +1220,7 @@ namespace ImmersiveProjector
 
         }
 
-        public void TileBatchDrawDecorator(On.Terraria.Graphics.TileBatch.orig_Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects orig,
+        public void TileBatchDrawDecorator(On_TileBatch.orig_Draw_Texture2D_Vector2_Nullable1_VertexColors_Vector2_float_SpriteEffects orig,
                                            TileBatch self, Texture2D texture, Vector2 position, Rectangle? sourceRectangle, VertexColors colors, Vector2 origin, float scale, SpriteEffects effects)
         {
             if (projectorLiquidProcessing)
@@ -1225,7 +1228,7 @@ namespace ImmersiveProjector
             orig(self, texture, position, sourceRectangle, colors, origin, scale, effects);
         }
 
-        public void TileBatchInternalDrawDecorator(On.Terraria.Graphics.TileBatch.orig_InternalDraw orig,
+        public void TileBatchInternalDrawDecorator(On_TileBatch.orig_InternalDraw orig,
                                            TileBatch self, Texture2D texture, Vector4 destinationRectangle, Rectangle? sourceRectangle, VertexColors colors, float rotation, Vector2 origin, SpriteEffects effect, float depth)
         {
             if (projectorLiquidProcessing)
@@ -1238,7 +1241,7 @@ namespace ImmersiveProjector
             orig(self, texture, destinationRectangle, sourceRectangle, colors, rotation, origin, effect, depth);
         }
 
-        public Color LightColorDecorator(On.Terraria.Lighting.orig_GetColor_int_int orig, int i, int j)
+        public Color LightColorDecorator(On_Lighting.orig_GetColor_int_int orig, int i, int j)
         {
             // Hack lighting engine to ensure dark tiles to be drawn
             if (projectorProcessing)
@@ -1276,14 +1279,14 @@ namespace ImmersiveProjector
                 return orig(i, j);
         }
 
-        public Color LightOverrideDecorator(On.Terraria.GameContent.Drawing.TileDrawing.orig_DrawTiles_GetLightOverride orig,
+        public Color LightOverrideDecorator(On_TileDrawing.orig_DrawTiles_GetLightOverride orig,
                                             TileDrawing self, int j, int i, Tile tileCache, ushort typeCache, short tileFrameX, short tileFrameY, Color tileLight)
         {
             Color result = orig(self, j, i, tileCache, typeCache, tileFrameX, tileFrameY, tileLight);
             return result;
         }
 
-        public int NewGoreDecorator(On.Terraria.Gore.orig_NewGore_IEntitySource_Vector2_Vector2_int_float orig, 
+        public int NewGoreDecorator(On_Gore.orig_NewGore_IEntitySource_Vector2_Vector2_int_float orig, 
                                     IEntitySource source, Vector2 position, Vector2 velocity, int type, float scale)
         {
             int id = orig(source, position, velocity, type, scale);
@@ -1292,7 +1295,7 @@ namespace ImmersiveProjector
             return id;
         }
 
-        public int NewDustDecorator(On.Terraria.Dust.orig_NewDust orig, Vector2 position, int width, int height, int type,
+        public int NewDustDecorator(On_Dust.orig_NewDust orig, Vector2 position, int width, int height, int type,
                                     float speedX, float speedY, int alpha, Color color, float scale)
         {
             if (banNewDust)
@@ -1323,7 +1326,7 @@ namespace ImmersiveProjector
             cursor.MarkLabel(noReturn);
         }
 
-        public void LightingInitializeDecorator(On.Terraria.Lighting.orig_Initialize orig)
+        public void LightingInitializeDecorator(On_Lighting.orig_Initialize orig)
         {
             orig();
             // Rebuild our lighting engine whenever the vanilla rebuild method is called
@@ -1336,7 +1339,7 @@ namespace ImmersiveProjector
             }
         }
 
-        public void ScreenEffectDecorator(On.Terraria.Graphics.Effects.FilterManager.orig_EndCapture orig,
+        public void ScreenEffectDecorator(On_FilterManager.orig_EndCapture orig,
                                           Terraria.Graphics.Effects.FilterManager self,
                                           RenderTarget2D finalTexture, RenderTarget2D screenTarget1,
                                           RenderTarget2D screenTarget2, Color clearColor)

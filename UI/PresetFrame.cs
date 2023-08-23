@@ -114,9 +114,9 @@ namespace ImmersiveProjector.UI
             base.MouseOut(evt);
         }
 
-        public override void Click(UIMouseEvent evt)
+        public override void LeftClick(UIMouseEvent evt)
         {
-            base.Click(evt);
+            base.LeftClick(evt);
             if (Parent.Parent is PresetGrid grid)
             {
                 grid.handleClick(this);

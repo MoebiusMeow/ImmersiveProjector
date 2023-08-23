@@ -121,9 +121,9 @@ namespace ImmersiveProjector.UI
             base.MouseOut(evt);
         }
 
-        public override void MouseDown(UIMouseEvent evt)
+        public override void LeftMouseDown(UIMouseEvent evt)
         {
-            base.MouseDown(evt);
+            base.LeftMouseDown(evt);
             if (UISystem.Instance.MouseBlocked(true))
                 return;
             if (!dragging)
@@ -133,9 +133,9 @@ namespace ImmersiveProjector.UI
             }
         }
 
-        public override void MouseUp(UIMouseEvent evt)
+        public override void LeftMouseUp(UIMouseEvent evt)
         {
-            base.MouseUp(evt);
+            base.LeftMouseUp(evt);
             dragging = false;
         }
 

@@ -51,11 +51,11 @@ namespace ImmersiveProjector.DataStructure
 
         public float fadingValue;
 
-        public Vector2 targetSize => data.targetSize;
-        public Vector2 sourceTopLeft => data.sourceTopLeft;
-        public Vector2 sourceBottomRight => data.sourceBottomRight;
-        public Vector2 targetTopLeft => data.targetTopLeft;
-        public Vector2 targetBottomRight => data.targetBottomRight;
+        public Vector2 TargetSize => data.targetSize;
+        public Vector2 SourceTopLeft => data.sourceTopLeft;
+        public Vector2 SourceBottomRight => data.sourceBottomRight;
+        public Vector2 TargetTopLeft => data.targetTopLeft;
+        public Vector2 TargetBottomRight => data.targetBottomRight;
 
         private ProjectorInstance(Point tilePosition)
         {

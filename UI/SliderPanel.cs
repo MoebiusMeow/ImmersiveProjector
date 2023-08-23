@@ -33,7 +33,10 @@ namespace ImmersiveProjector.UI
         public PropertyInfo bindedValue;
         public ProjectorData bindedObject;
 
-        public SliderPanel(float valueMin, float valueMax, Color color, Asset<Texture2D> background, Asset<Texture2D> border = null) : base(background, border)
+        public SliderPanel(float valueMin, float valueMax, Color color,
+                           Asset<Texture2D> background,
+                           Asset<Texture2D> border = null,
+                           Func<float, Color> blipFunc = null) : base(background, border)
         {
             this.valueMin = valueMin;
             this.valueMax = valueMax;
@@ -52,7 +55,7 @@ namespace ImmersiveProjector.UI
                     if (bindedValue != null && bindedObject != null)
                         bindedValue.SetValue(bindedObject, currentValue);
                 },
-                () => { }, (float v) => color * v, Color.White);
+                () => { }, blipFunc ?? ((float v) => color * v), Color.White);
             slider.Width.Set(0, 1);
             slider.Height.Set(0, 1);
             slider.HAlign = 1;
@@ -73,14 +76,14 @@ namespace ImmersiveProjector.UI
             Append(valueText);
         }
 
-        public override void MouseDown(UIMouseEvent evt)
+        public override void LeftMouseDown(UIMouseEvent evt)
         {
-            base.MouseDown(evt);
+            base.LeftMouseDown(evt);
         }
 
-        public override void MouseUp(UIMouseEvent evt)
+        public override void LeftMouseUp(UIMouseEvent evt)
         {
-            base.MouseUp(evt);
+            base.LeftMouseUp(evt);
         }
 
         public override void MouseOver(UIMouseEvent evt)
@@ -89,9 +92,9 @@ namespace ImmersiveProjector.UI
             // SoundEngine.PlaySound(SoundID.MenuTick);
         }
 
-        public override void Click(UIMouseEvent evt)
+        public override void LeftClick(UIMouseEvent evt)
         {
-            base.Click(evt);
+            base.LeftClick(evt);
         }
 
         public override void Update(GameTime gameTime)

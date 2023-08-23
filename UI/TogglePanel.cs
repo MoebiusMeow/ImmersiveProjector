@@ -54,14 +54,14 @@ namespace ImmersiveProjector.UI
             Append(toggleItem);
         }
 
-        public override void MouseDown(UIMouseEvent evt)
+        public override void LeftMouseDown(UIMouseEvent evt)
         {
-            base.MouseDown(evt);
+            base.LeftMouseDown(evt);
         }
 
-        public override void MouseUp(UIMouseEvent evt)
+        public override void LeftMouseUp(UIMouseEvent evt)
         {
-            base.MouseUp(evt);
+            base.LeftMouseUp(evt);
         }
 
         public override void MouseOver(UIMouseEvent evt)
@@ -70,13 +70,27 @@ namespace ImmersiveProjector.UI
             // SoundEngine.PlaySound(SoundID.MenuTick);
         }
 
-        public override void Click(UIMouseEvent evt)
+        public override void LeftClick(UIMouseEvent evt)
         {
-            base.Click(evt);
+            base.LeftClick(evt);
             if (valueRange > 0)
             {
                 SoundEngine.PlaySound(SoundID.MenuTick);
                 currentValue = (currentValue + 1) % valueRange;
+                if (onValueChanged != null)
+                    onValueChanged(currentValue);
+                if (bindedValue != null && bindedObject != null)
+                    bindedValue.SetValue(bindedObject, currentValue);
+            }
+        }
+
+        public override void RightClick(UIMouseEvent evt)
+        {
+            base.RightClick(evt);
+            if (valueRange > 0)
+            {
+                SoundEngine.PlaySound(SoundID.MenuTick);
+                currentValue = (currentValue + valueRange - 1) % valueRange;
                 if (onValueChanged != null)
                     onValueChanged(currentValue);
                 if (bindedValue != null && bindedObject != null)

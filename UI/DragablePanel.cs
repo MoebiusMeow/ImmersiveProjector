@@ -11,9 +11,9 @@ namespace ImmersiveProjector.UI
         public bool dragging;
         public Vector2 draggingAnchor;
 
-        public override void MouseDown(UIMouseEvent evt)
+        public override void LeftMouseDown(UIMouseEvent evt)
         {
-            base.MouseDown(evt);
+            base.LeftMouseDown(evt);
             UIElement element = GetElementAt(evt.MousePosition);
             if (element is UIScrollbar) return;
             if (element is UIColoredSlider) return;
@@ -25,9 +25,9 @@ namespace ImmersiveProjector.UI
             }
         }
 
-        public override void MouseUp(UIMouseEvent evt)
+        public override void LeftMouseUp(UIMouseEvent evt)
         {
-            base.MouseUp(evt);
+            base.LeftMouseUp(evt);
             dragging = false;
         }
 

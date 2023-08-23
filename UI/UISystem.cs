@@ -26,20 +26,20 @@ namespace ImmersiveProjector
             userInterface = new UserInterface();
             userInterface.SetState(null);
 
-            On.Terraria.UI.ItemSlot.MouseHover_ItemArray_int_int += ItemSlotMouseHoverDecorator;
-            On.Terraria.UI.ItemSlot.LeftClick_ItemArray_int_int += ItemSlotLeftClickDecorator;
-            On.Terraria.UI.ItemSlot.RightClick_ItemArray_int_int += ItemSlotRightClickDecorator;
-            On.Terraria.UI.ChestUI.UpdateHover += ChestHoverDecorator;
-            On.Terraria.Main.DrawInventory += DrawInventoryDecorator;
+            On_ItemSlot.MouseHover_ItemArray_int_int += ItemSlotMouseHoverDecorator;
+            On_ItemSlot.LeftClick_ItemArray_int_int += ItemSlotLeftClickDecorator;
+            On_ItemSlot.RightClick_ItemArray_int_int += ItemSlotRightClickDecorator;
+            On_ChestUI.UpdateHover += ChestHoverDecorator;
+            On_Main.DrawInventory += DrawInventoryDecorator;
         }
 
         public override void Unload()
         {
-            On.Terraria.UI.ItemSlot.MouseHover_ItemArray_int_int -= ItemSlotMouseHoverDecorator;
-            On.Terraria.UI.ItemSlot.LeftClick_ItemArray_int_int -= ItemSlotLeftClickDecorator;
-            On.Terraria.UI.ItemSlot.RightClick_ItemArray_int_int -= ItemSlotRightClickDecorator;
-            On.Terraria.UI.ChestUI.UpdateHover -= ChestHoverDecorator;
-            On.Terraria.Main.DrawInventory -= DrawInventoryDecorator;
+            On_ItemSlot.MouseHover_ItemArray_int_int -= ItemSlotMouseHoverDecorator;
+            On_ItemSlot.LeftClick_ItemArray_int_int -= ItemSlotLeftClickDecorator;
+            On_ItemSlot.RightClick_ItemArray_int_int -= ItemSlotRightClickDecorator;
+            On_ChestUI.UpdateHover -= ChestHoverDecorator;
+            On_Main.DrawInventory -= DrawInventoryDecorator;
             base.Unload();
         }
 
@@ -79,7 +79,7 @@ namespace ImmersiveProjector
             return false;
         }
 
-        public void ItemSlotMouseHoverDecorator(On.Terraria.UI.ItemSlot.orig_MouseHover_ItemArray_int_int orig,
+        public void ItemSlotMouseHoverDecorator(On_ItemSlot.orig_MouseHover_ItemArray_int_int orig,
                                                 Item[] inv, int context, int slot)
         {
             Item i = inv[slot];
@@ -92,13 +92,13 @@ namespace ImmersiveProjector
             orig(inv, context, slot);
         }
 
-        public bool ItemSlotOverrideLeftClickDecorator(On.Terraria.UI.ItemSlot.orig_OverrideLeftClick orig,
+        public bool ItemSlotOverrideLeftClickDecorator(On_ItemSlot.orig_OverrideLeftClick orig,
                                                        Item[] inv, int context, int slot)
         {
             return orig(inv, context, slot);
         }
 
-        public void ItemSlotLeftClickDecorator(On.Terraria.UI.ItemSlot.orig_LeftClick_ItemArray_int_int orig,
+        public void ItemSlotLeftClickDecorator(On_ItemSlot.orig_LeftClick_ItemArray_int_int orig,
                                                Item[] inv, int context, int slot)
         {
             Item i = inv[slot];
@@ -111,19 +111,19 @@ namespace ImmersiveProjector
             orig(inv, context, slot);
         }
 
-        public void ItemSlotRightClickDecorator(On.Terraria.UI.ItemSlot.orig_RightClick_ItemArray_int_int orig,
+        public void ItemSlotRightClickDecorator(On_ItemSlot.orig_RightClick_ItemArray_int_int orig,
                                                 Item[] inv, int context, int slot)
         {
             orig(inv, context, slot);
         }
-        public void ChestHoverDecorator(On.Terraria.UI.ChestUI.orig_UpdateHover orig, int ID, bool hovering)
+        public void ChestHoverDecorator(On_ChestUI.orig_UpdateHover orig, int ID, bool hovering)
         {
             if (MouseBlocked())
                 hovering = false;
             orig(ID, hovering);
         }
 
-        public void DrawInventoryDecorator(On.Terraria.Main.orig_DrawInventory orig, Main self)
+        public void DrawInventoryDecorator(On_Main.orig_DrawInventory orig, Main self)
         {
             var orig_itemAnimation = Main.LocalPlayer.itemAnimation;
             if (MouseBlocked())
