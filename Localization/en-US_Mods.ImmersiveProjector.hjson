@@ -61,8 +61,10 @@ Configs: {
 	CaptureLightFreqencyToolTip: Reduce lighting freqency for higher performance
 	CaptureFreqency: Refresh Freqency
 	CaptureFreqencyToolTip: Reduce refresh freqency for higher performance (GPU RAM required)
-	CaptureParallax: Parallax
-	CaptureParallaxToolTip: The length of the pink line
+	CaptureParallax: Parallax (target)
+	CaptureParallaxToolTip: How the projection moves when the camera moves (The length of the pink line)
+	CaptureSourceParallax: Parallax (source)
+	CaptureSourceParallaxToolTip: How the source area moves when the camera moves (The length of the violet line)
 	Yes: Yes
 	No: No
 	Red: Red

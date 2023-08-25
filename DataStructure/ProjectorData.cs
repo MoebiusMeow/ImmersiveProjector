@@ -139,6 +139,7 @@ namespace ImmersiveProjector.DataStructure
         public float colorV { get; set; }
         public float colorA { get; set; }
         public float parallax { get; set; }
+        public float sourceParallax { get; set; }
         public float lightFreq { get; set; }
         public float updateFreq { get; set; }
         public float colorR { get; set; }

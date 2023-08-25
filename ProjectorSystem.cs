@@ -1052,7 +1052,7 @@ namespace ImmersiveProjector
                 if ((structure.data.sourceFollow != 0 || structure.data.targetFollow != 0))
                 {
                     Vector2 followOffset = structure.data.sourceFollow != 0 && findingTargetFlag ?
-                                           structure.cacheSourceOffset : Vector2.Zero;
+                                           structure.cacheSourceOffset - structure.cacheSourceParallaxOffset : Vector2.Zero;
                     s1 = s0 = structure.data.sourcePoint;
                     t0 = structure.tilePosition.ToWorldCoordinates(8, 8);
                     t1 = structure.tilePosition.ToWorldCoordinates(8, 8);
@@ -1093,6 +1093,18 @@ namespace ImmersiveProjector
                             QuickDrawBox(targetBoundTopLeft + structure.cacheParallaxOffset + followOffset, targetBoundingR * 2, color);
                         }
                     }
+                    if (structure.cacheSourceParallaxOffset.Length() > 0)
+                    {
+                        color = Color.Violet;
+                        followOffset = structure.data.sourceFollow != 0 && findingTargetFlag ?
+                                       structure.cacheSourceOffset - structure.cacheSourceParallaxOffset : Vector2.Zero;
+                        QuickDrawLine(structure.tilePosition.ToWorldCoordinates() + followOffset, Main.Camera.Center, color);
+                        if (findingTargetFlag)
+                        {
+                            QuickDrawLine(followOffset + structure.data.sourcePoint + structure.cacheSourceParallaxOffset, structure.data.sourcePoint + followOffset, color);
+                            QuickDrawBox(structure.SourceTopLeft + structure.cacheSourceParallaxOffset + followOffset, structure.data.sourceSize, color);
+                        }
+                    }
                 }
                 else
                 {
@@ -1110,9 +1122,16 @@ namespace ImmersiveProjector
                     if (structure.cacheParallaxOffset.Length() > 0)
                     {
                         color = Color.Pink;
-                        QuickDrawLine(structure.data.targetPoint, structure.data.targetPoint + structure.cacheParallaxOffset, color);
                         QuickDrawLine(structure.tilePosition.ToWorldCoordinates(), Main.Camera.Center, color);
+                        QuickDrawLine(structure.data.targetPoint, structure.data.targetPoint + structure.cacheParallaxOffset, color);
                         QuickDrawBox(targetBoundTopLeft + structure.cacheParallaxOffset, targetBoundingR * 2, color);
+                    }
+                    if (structure.cacheSourceParallaxOffset.Length() > 0)
+                    {
+                        color = Color.Violet;
+                        QuickDrawLine(structure.tilePosition.ToWorldCoordinates(), Main.Camera.Center, color);
+                        QuickDrawLine(structure.data.sourcePoint + structure.cacheSourceParallaxOffset, structure.data.sourcePoint, color);
+                        QuickDrawBox(structure.SourceTopLeft + structure.cacheSourceParallaxOffset, structure.data.sourceSize, color);
                     }
                 }
                 Main.spriteBatch.End();

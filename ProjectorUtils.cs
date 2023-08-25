@@ -343,6 +343,15 @@ namespace ImmersiveProjector
                     }
                     break;
             }
+            structure.cacheSourceParallaxOffset = Vector2.Zero;
+            if (structure.data.sourceParallax != 0 && Main.myPlayer != 255)
+            {
+                structure.cacheSourceParallaxOffset = structure.data.sourceParallax *
+                    ((CaptureManager.Instance.IsCapturing ? Main.LocalPlayer.Center : Main.Camera.Center) - structure.tilePosition.ToWorldCoordinates());
+                // structure.cacheSourceParallaxOffset = structure.data.sourceParallax *
+                // ((CaptureManager.Instance.IsCapturing ? Main.LocalPlayer.Center : Main.Camera.Center) - structure.data.targetPoint);
+                sourceFollowOffset += structure.cacheSourceParallaxOffset;
+            }
             structure.cacheSourceOffset = sourceFollowOffset;
             sourceTopLeft += sourceFollowOffset;
             sourceBottomRight += sourceFollowOffset;

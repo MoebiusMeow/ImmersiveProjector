@@ -53,7 +53,7 @@ Configs: {
 	CaptureLayersBW: 墙体后
 	CaptureLightingSources: 光源选择
 	CaptureLightingSourcesS: 原始区域
-	CaptureLightingSourcesT: 目标区域
+	CaptureLightingSourcesT: 影像区域
 	CaptureLightingSourcesB: 二者之和
 	CapturePriority: 层叠优先级
 	CapturePriorityToolTip: 重叠的投影间的相互优先级
@@ -61,8 +61,10 @@ Configs: {
 	CaptureLightFreqencyToolTip: 通过减少光照更新来提升性能
 	CaptureFreqency: 更新频率
 	CaptureFreqencyToolTip: 通过缓存图像来提升性能 (需要显存)
-	CaptureParallax: 视差
-	CaptureParallaxToolTip: 粉色视差线的长度比例
+	CaptureParallax: 视差（影像）
+	CaptureParallaxToolTip: 投影影像随相机移动而移动（粉色视差线的长度比例）
+	CaptureSourceParallax: 视差（来源）
+	CaptureSourceParallaxToolTip: 投影来源随相机移动而移动（紫色视差线的长度比例）
 	Yes: 是
 	No: 否
 	Red: 红
@@ -80,9 +82,9 @@ Configs: {
 	CaptureBehaviorH: 淡出至一半
 	CaptureBehaviorF: 完全淡出
 	CaptureBehaviorD: 影像扰动
-	CaptureFollowS: 摄像区域跟踪
+	CaptureFollowS: 来源区域跟踪
 	CaptureFollowSId: (对象下标)
-	CaptureFollowT: 投影区域跟踪
+	CaptureFollowT: 影像区域跟踪
 	CaptureFollowTId: (对象下标)
 	CaptureFollowFlip: 同步翻转
 	CaptureFollowRotation: 同步旋转
