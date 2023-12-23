@@ -5,6 +5,7 @@ The projection area can be as large as the whole world.
 从此你能投影世界上的一切，不论山川草木，整个世界不过咫尺
 
 ----------
+v0.1.1.6: Update to 1.4.4 tML. 更新至1.4.4tModLoader。
 v0.1.1: Bug fix, performance optimization, new features. 修复了一些Bug，提升了性能并加入了新功能。
 Configable lighting frequency, HSV filter, relative position, parallax, dust system, and mixing lighting from both source and target areas.
 如光照频率，HSV滤镜，相对位置，视差，粒子系统，源区域和目标区域的光照混合。

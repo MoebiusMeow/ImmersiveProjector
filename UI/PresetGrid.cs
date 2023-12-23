@@ -8,25 +8,25 @@ using Terraria.UI;
 
 namespace ImmersiveProjector.UI
 {
-	public class PresetGrid : UIGrid
-	{
-		public int selectedType = -1;
-		public string selectedName = "";
+    public class PresetGrid : UIGrid
+    {
+        public int selectedType = -1;
+        public string selectedName = "";
 
-		public void handleClick(PresetFrame target)
-		{
-			selectedType = target.presetTypeKey;
-			selectedName = target.presetName;
-		}
+        public void handleClick(PresetFrame target)
+        {
+            selectedType = target.presetTypeKey;
+            selectedName = target.presetName;
+        }
 
-		public override void Update(GameTime gameTime)
-		{
-			base.Update(gameTime);
-			foreach (var i in _items)
-				if (i is PresetFrame frame)
-				{
-					frame.selected = (frame.presetTypeKey == selectedType && frame.presetName == selectedName);
-				}
-		}
-	}
+        public override void Update(GameTime gameTime)
+        {
+            base.Update(gameTime);
+            foreach (var i in _items)
+                if (i is PresetFrame frame)
+                {
+                    frame.selected = (frame.presetTypeKey == selectedType && frame.presetName == selectedName);
+                }
+        }
+    }
 }

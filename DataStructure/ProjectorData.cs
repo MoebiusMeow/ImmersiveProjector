@@ -14,8 +14,8 @@ using static Terraria.WaterfallManager;
 namespace ImmersiveProjector.DataStructure
 {
     [Serializable]
-	public class ProjectorData 
-	{
+    public class ProjectorData 
+    {
         public enum FlipFlag
         {
             None = 0,
@@ -62,7 +62,9 @@ namespace ImmersiveProjector.DataStructure
         public enum FilterFlag
         {
             None = 0,
-            Holographic = 1
+            Holographic = 1,
+            Border = 2,
+            Blur = 3,
         }
         public enum CaptureSolidFlag
         {
@@ -110,23 +112,6 @@ namespace ImmersiveProjector.DataStructure
         public int sourceFollow { get; set; }
         public float sourceFollowId { get; set; }
 
-        private int _sourceFollowMisc;
-        public int sourceFollowRotation 
-        { 
-            get => ((_sourceFollowMisc & (int)MiscFollowOptionMask.FollowRotation) > 0).ToInt(); 
-            set => _sourceFollowMisc = (_sourceFollowMisc | (int)MiscFollowOptionMask.FollowRotation) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowRotation); 
-        }
-        public int sourceFollowSpeedRotation 
-        { 
-            get => ((_sourceFollowMisc & (int)MiscFollowOptionMask.FollowSpeedRotation) > 0).ToInt(); 
-            set => _sourceFollowMisc = (_sourceFollowMisc | (int)MiscFollowOptionMask.FollowSpeedRotation) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowSpeedRotation); 
-        }
-        public int sourceFollowFlip
-        { 
-            get => ((_sourceFollowMisc & (int)MiscFollowOptionMask.FollowFlip) > 0).ToInt(); 
-            set => _sourceFollowMisc = (_sourceFollowMisc | (int)MiscFollowOptionMask.FollowFlip) ^ ((1 - value) * (int)MiscFollowOptionMask.FollowFlip); 
-        }
-
         public int targetFollow { get; set; }
         public float targetFollowId { get; set; }
         private int _targetFollowMisc;
@@ -154,6 +139,7 @@ namespace ImmersiveProjector.DataStructure
         public float colorV { get; set; }
         public float colorA { get; set; }
         public float parallax { get; set; }
+        public float sourceParallax { get; set; }
         public float lightFreq { get; set; }
         public float updateFreq { get; set; }
         public float colorR { get; set; }
@@ -242,6 +228,6 @@ namespace ImmersiveProjector.DataStructure
             var result = JsonSerializer.Serialize<ProjectorData>(this, options);
             return result;
         }
-	}
+    }
 
 }

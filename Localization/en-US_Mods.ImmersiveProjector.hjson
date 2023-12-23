@@ -1,0 +1,115 @@
+Items: {
+	MiniProjector: {
+		DisplayName: Mini Projector
+		Tooltip:
+			'''
+			A highly compressed projector for general purpose
+			[c/00FF00:Interact to config the projector]
+
+			¡®Not edible... This is not a cookie¡¯
+			'''
+	}
+}
+
+Tiles.MiniProjectorTile.MapEntry: "{$Mods.ImmersiveProjector.Items.MiniProjector.DisplayName}"
+
+Configs: {
+	Prefabs: Presets
+	SelectArea: Select Area
+	Settings: Settings
+	Behavior: Behavior
+	Color: Color
+	Description0: Presets Browser
+	Description1: Select projection area
+	Description2: Projector Settings
+	Description3: Interaction Behavior
+	Description4: Projection Color
+	Snapping: Snapping
+	SnappingBlock: Block
+	Flip: Flip
+	FlipN: No Flip
+	FlipH: Flip Horizontally
+	FlipV: Flip Vertically
+	DoubleClickResetPosition: Double Click to Reset both areas
+	DoubleClickResetScale: Reset current scale
+	TargetRotation: Rotate Target Area
+	CaptureTiles: Capture Tiles
+	CaptureTilesN: None
+	CaptureTilesS: Solid tiles only
+	CaptureTilesA: All tiles
+	CaptureWalls: Capture Walls
+	CaptureWallsN: None
+	CaptureWallsT: All walls
+	CaptureCreatures: Capture Entities
+	CaptureCreaturesN: None
+	CaptureCreaturesA: All Entities
+	CaptureBlends: Blending
+	CaptureBlendsD: Default
+	CaptureBlendsA: Additive light
+	CaptureLayers: Projection Layer
+	CaptureLayersF: Foreground
+	CaptureLayersN: Normal
+	CaptureLayersBF: Behind furnitures
+	CaptureLayersBW: Behind walls
+	CaptureLightingSources: Lighting Source
+	CaptureLightingSourcesS: Source area
+	CaptureLightingSourcesT: Target area
+	CaptureLightingSourcesB: Both areas
+	CapturePriority: Layer Priority
+	CapturePriorityToolTip: Layer Priority among stacked projections
+	CaptureLightFreqency: Lighting Freqency
+	CaptureLightFreqencyToolTip: Reduce lighting freqency for higher performance
+	CaptureFreqency: Refresh Freqency
+	CaptureFreqencyToolTip: Reduce refresh freqency for higher performance (GPU RAM required)
+	CaptureParallax: Parallax (target)
+	CaptureParallaxToolTip: How the projection moves when the camera moves (The length of the pink line)
+	CaptureSourceParallax: Parallax (source)
+	CaptureSourceParallaxToolTip: How the source area moves when the camera moves (The length of the violet line)
+	Yes: Yes
+	No: No
+	Red: Red
+	Green: Green
+	Blue: Blue
+	ColorR: Base Red
+	ColorG: Base Green
+	ColorB: Base Blue
+	ColorH: Hue
+	ColorS: Saturation
+	ColorV: Brightness
+	Opacity: Opacity
+	CaptureBehavior: When players enter
+	CaptureBehaviorN: Do nothing
+	CaptureBehaviorH: Half-faded
+	CaptureBehaviorF: Faded
+	CaptureBehaviorD: Distorted
+	CaptureFollowS: Source area following
+	CaptureFollowSId: (Select index)
+	CaptureFollowT: Target area following
+	CaptureFollowTId: (Select index)
+	CaptureFollowFlip: Sync flip
+	CaptureFollowRotation: Rotation
+	CaptureFollowN: Nothing
+	CaptureFollowP: A player
+	CaptureFollowTN: A town NPC
+	CaptureFollowB: A boss
+	CaptureFilter: Visual effects
+	CaptureFilterN: No Filter
+	CaptureFilterH: Hologram
+	CaptureFilterO: Outline
+	CaptureFilterB: Gaussian Blur
+	Cancel: Cancel
+	Hide: Hide
+	Confirm: Confim
+	SearchPreset: Search
+
+	ImmersiveProjectorConfig: {
+		DisplayName: Global Configs
+
+		EnableDebug: {
+			Label: Debug Mode
+			Tooltip: Enable debug features (e.g. Debug logs)
+		}
+	}
+
+	Debug: Debug Configs
+}
